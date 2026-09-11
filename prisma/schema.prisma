@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum AuthProvider {
+  GOOGLE
+  CREDENTIALS
+}
+
+enum BusinessType {
+  CLINIC
+  FNB
+  BARBERSHOP
+  GYM
+  TOURISM
+  OTHER
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum ContactLifecycle {
+  NEW_LEAD
+  CONTACTED
+  INTERESTED
+  BOOKED
+  CUSTOMER
+  RETURNING
+  INACTIVE
+  LOST
+}
+
+enum LeadSource {
+  WHATSAPP
+  INSTAGRAM
+  WEBSITE
+  REFERRAL
+  OTHER
+}
+
+enum ContactGender {
+  FEMALE
+  MALE
+  OTHER
+  UNSPECIFIED
+}
+
+enum FollowUpType {
+  BOOKING
+  REMINDER
+  POST_SERVICE
+  PROMO
+  UNREPLIED
+  NO_BOOKING
+  CUSTOM
+}
+
+enum FollowUpStatus {
+  PENDING
+  DONE
+  SKIPPED
+}
+
+enum CrmBookingStatus {
+  BOOKED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Business {
+  id              String           @id @default(cuid())
+  name            String
+  businessType    BusinessType
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  users           User[]
+  whatsAppNumbers WhatsAppNumber[]
+  contacts        Contact[]
+  conversations   Conversation[]
+  tags            Tag[]
+  crmBookings     CrmBooking[]
+  practitioners   Practitioner[]
+  aiAutomation    AiAutomationSettings?
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  username     String?       @unique
+  password     String?
+  name         String?
+  image        String?
+  googleId     String?       @unique
+  authProvider AuthProvider
+  role         Role          @default(STAFF)
+  businessId   String
+  business     Business      @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([businessId])
+}
+
+model WhatsAppNumber {
+  id            String   @id @default(cuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  phoneNumberId String   @unique
+  displayNumber String?
+  wabaId        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([businessId])
+}
+
+model AiAutomationSettings {
+  id                  String   @id @default(cuid())
+  businessId          String   @unique
+  business            Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  enabled             Boolean  @default(true)
+  welcomeEnabled      Boolean  @default(true)
+  welcomeMessage      String   @db.Text
+  bookingSystemPrompt String   @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Practitioner {
+  id                   String    @id @default(cuid())
+  businessId           String
+  business             Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name                 String
+  title                String?
+  specialty            String?
+  email                String?
+  phone                String?
+  location             String?
+  bio                  String?
+  isActive             Boolean   @default(true)
+  timezone             String    @default("Asia/Jakarta")
+  /// UI accent: primary | secondary | success
+  tone                 String    @default("primary")
+  /// Google Calendar connection (filled after OAuth)
+  googleAccountEmail   String?
+  googleCalendarId     String?
+  googleRefreshToken   String?
+  googleAccessToken    String?
+  googleTokenExpiresAt DateTime?
+  googleConnectedAt    DateTime?
+  calendarSyncEnabled  Boolean   @default(false)
+  bookings             CrmBooking[]
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([businessId, isActive])
+  @@index([businessId, name])
+}
+
+model Contact {
+  id              String           @id @default(cuid())
+  businessId      String
+  business        Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  waId            String
+  name            String?
+  email           String?
+  gender          ContactGender    @default(UNSPECIFIED)
+  birthDate       DateTime?
+  source          LeadSource       @default(WHATSAPP)
+  lifecycle       ContactLifecycle @default(NEW_LEAD)
+  assignedStaff   String?
+  potentialValue  Int?
+  nextFollowUpAt  DateTime?
+  conversations   Conversation[]
+  tags            ContactTag[]
+  notes           ContactNote[]
+  followUps       ContactFollowUp[]
+  bookings        CrmBooking[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([businessId, waId])
+  @@index([businessId])
+  @@index([businessId, lifecycle])
+  @@index([businessId, nextFollowUpAt])
+}
+
+model Tag {
+  id         String       @id @default(cuid())
+  businessId String
+  business   Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  color      String       @default("primary")
+  contacts   ContactTag[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([businessId, name])
+  @@index([businessId])
+}
+
+model ContactTag {
+  contactId String
+  tagId     String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([contactId, tagId])
+  @@index([tagId])
+}
+
+model ContactNote {
+  id        String   @id @default(cuid())
+  contactId String
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  authorId  String?
+  authorName String?
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([contactId, createdAt])
+}
+
+model ContactFollowUp {
+  id          String         @id @default(cuid())
+  contactId   String
+  contact     Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  type        FollowUpType   @default(CUSTOM)
+  status      FollowUpStatus @default(PENDING)
+  dueAt       DateTime
+  note        String?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([contactId, dueAt])
+  @@index([status, dueAt])
+}
+
+model CrmBooking {
+  id             String           @id @default(cuid())
+  businessId     String
+  business       Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  practitionerId String?
+  practitioner   Practitioner?    @relation(fields: [practitionerId], references: [id], onDelete: SetNull)
+  service        String
+  staffName      String?
+  status         CrmBookingStatus @default(BOOKED)
+  amount         Int              @default(0)
+  scheduledAt    DateTime
+  completedAt    DateTime?
+  googleEventId  String?
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([businessId, scheduledAt])
+  @@index([contactId, scheduledAt])
+  @@index([practitionerId, scheduledAt])
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  businessId    String
+  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contactId     String
+  contact       Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  channel       String    @default("whatsapp")
+  lastMessageAt DateTime  @default(now())
+  lastPreview   String    @default("")
+  unreadCount   Int       @default(0)
+  /// Per-conversation AI auto-reply switch (chat header toggle)
+  aiEnabled     Boolean   @default(true)
+  messages      Message[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([businessId, contactId, channel])
+  @@index([businessId, lastMessageAt])
+}
+
+model Message {
+  id             String                @id @default(cuid())
+  conversationId String
+  conversation   Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  waMessageId    String?               @unique
+  direction      MessageDirection
+  type           String                @default("text")
+  text           String?
+  status         MessageDeliveryStatus @default(SENT)
+  sentAt         DateTime
+  createdAt      DateTime              @default(now())
+
+  @@index([conversationId, sentAt])
+}

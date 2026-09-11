@@ -1,0 +1,80 @@
+import { landingPage } from "@/data/landing-page";
+import { Icon } from "@/components/ui/icon";
+import { SectionHeading } from "@/components/landing/section-heading";
+
+export function Pricing() {
+  const { pricing } = landingPage;
+
+  return (
+    <section
+      id={pricing.id}
+      className="w-full border-y border-outline-variant bg-white py-20"
+    >
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <SectionHeading
+          eyebrow={pricing.eyebrow}
+          title={pricing.title}
+          description={pricing.description}
+          align="center"
+          className="mx-auto mb-12 max-w-3xl text-center"
+        />
+
+        <div className="mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-8 lg:grid-cols-3">
+          {pricing.plans.map((plan) => (
+            <div
+              key={plan.name}
+              className={`relative flex flex-col justify-between rounded-2xl p-6 sm:p-8 ${
+                plan.featured
+                  ? "border-2 border-primary bg-white shadow-xl"
+                  : "border border-outline-variant bg-surface-container-low"
+              }`}
+            >
+              {plan.featured ? (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 font-mono text-[10px] font-bold tracking-wider text-white uppercase shadow-xs">
+                  {plan.badge}
+                </div>
+              ) : null}
+              <div>
+                <h3 className="mb-1 text-lg font-bold text-on-surface">
+                  {plan.name}
+                </h3>
+                <p className="mb-4 text-xs text-on-surface-variant">
+                  {plan.description}
+                </p>
+                <div className="mb-6">
+                  <span className="text-3xl font-bold text-on-surface">
+                    {plan.price}
+                  </span>
+                  <span className="font-mono text-xs text-on-surface-variant">
+                    {plan.period}
+                  </span>
+                </div>
+                <ul className="mb-8 space-y-2.5 font-sans text-xs text-on-surface">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-2">
+                      <Icon
+                        name="check"
+                        className="text-base text-primary-dark"
+                      />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <a
+                href="#"
+                className={`rounded-lg py-2.5 text-center text-xs font-semibold transition-all ${
+                  plan.featured
+                    ? "bg-primary text-white shadow-xs hover:bg-primary-dark"
+                    : "border border-outline-variant bg-white text-on-surface hover:bg-surface-container"
+                }`}
+              >
+                {plan.cta}
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
