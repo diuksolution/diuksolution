@@ -15,7 +15,8 @@ export const landingPage = {
     cta: { label: "Get Started", href: "#pricing" },
   },
   hero: {
-    badge: "DIUK Engine 2.0 • Conversational Commerce",
+    badge: "DIUK Solution • Conversational Commerce",
+    brand: "DIUK",
     headline: "Turn Every Customer Conversation Into a",
     headlineAccent: "Transaction.",
     subtitle:
@@ -23,11 +24,26 @@ export const landingPage = {
     primaryCta: { label: "Get Started", href: "#pricing" },
     secondaryCta: { label: "See How It Works", href: "#how-it-works" },
     footnote: "Built for businesses that run on customer conversations.",
+    signals: [
+      { icon: "bolt", label: "1.1s avg reply" },
+      { icon: "forum", label: "WA + Instagram" },
+      { icon: "event_available", label: "Auto reservation" },
+    ],
     simulation: {
-      title: "diuk.network/senopati-node // Live Dispatch",
+      title: "diuksolution/chat // Live Dispatch",
       latency: "1.1s latency",
       version: "v2.4-stable",
     },
+  },
+  brands: {
+    label: "Trusted by businesses that run on customer conversations",
+    logos: [
+      { name: "Hai Banana", src: "/brands/haibanana.webp" },
+      { name: "Kasiko Coffee", src: "/brands/kasikocoffee.webp" },
+      { name: "Terra Furniture Lab", src: "/brands/terra.webp" },
+      { name: "Lebih Asri", src: "/brands/lebak.webp" },
+      { name: "Desa Wisata Alamendah", src: "/brands/dawala.webp" },
+    ],
   },
   trust: {
     label: "Built for businesses that run on customer conversations",
@@ -84,8 +100,10 @@ export const landingPage = {
     description: "How DIUK bridges messaging apps directly to your operations.",
     steps: [
       {
-        step: "01 / INBOUND",
+        step: "01",
+        stage: "INBOUND",
         label: "Customer Message",
+        icon: "chat",
         highlight: false,
         lines: [
           { kind: "meta" as const, text: "WhatsApp Message" },
@@ -96,8 +114,10 @@ export const landingPage = {
         ],
       },
       {
-        step: "02 / NLP ENGINE",
+        step: "02",
+        stage: "NLP ENGINE",
         label: "AI Response",
+        icon: "psychology",
         highlight: false,
         lines: [
           { kind: "success" as const, text: "Party: 4 guests" },
@@ -106,8 +126,10 @@ export const landingPage = {
         ],
       },
       {
-        step: "03 / CRM PROFILE",
+        step: "03",
+        stage: "CRM PROFILE",
         label: "Lead Captured",
+        icon: "person_search",
         highlight: false,
         lines: [
           { kind: "strong" as const, text: "VIP Lead matched" },
@@ -116,8 +138,10 @@ export const landingPage = {
         ],
       },
       {
-        step: "04 / RESERVATION",
+        step: "04",
+        stage: "RESERVATION",
         label: "Reservation Confirmed",
+        icon: "event_available",
         highlight: false,
         lines: [
           { kind: "success" as const, text: "Slot locked: Table 12" },
@@ -126,8 +150,10 @@ export const landingPage = {
         ],
       },
       {
-        step: "05 / OPERATIONS",
+        step: "05",
+        stage: "OPERATIONS",
         label: "CRM & Staff Synced",
+        icon: "sync_alt",
         highlight: true,
         lines: [
           { kind: "strong" as const, text: "Kitchen & Floor Synced" },
@@ -149,6 +175,8 @@ export const landingPage = {
         title: "AI Customer Service",
         description:
           "Handles Indonesian slang, colloquial questions, pricing, and operating hours instantly. No rigid decision trees.",
+        icon: "smart_toy",
+        accent: "green" as const,
         stats: [
           { icon: "bolt", label: "1.2s auto-reply", accent: true },
           { icon: "translate", label: "Bahasa Gaul + Formal", accent: false },
@@ -161,6 +189,8 @@ export const landingPage = {
         title: "Smart Reservation & Calendar",
         description:
           "Locks schedules in real-time. Automatically checks practitioner rosters, rooms, and chairs to eliminate overbooking completely.",
+        icon: "calendar_month",
+        accent: "navy" as const,
         stats: [
           { icon: "sync", label: "2-way Google Cal", accent: true },
           {
@@ -177,6 +207,8 @@ export const landingPage = {
         title: "Lead Pipeline & Conversational CRM",
         description:
           "Watch raw conversations transition into structured revenue. Leads move automatically across the sales stages with transaction tags.",
+        icon: "account_tree",
+        accent: "teal" as const,
         stats: [
           { icon: "filter_alt", label: "Auto-tagging", accent: true },
           { icon: "payments", label: "Realized IDR values", accent: false },
@@ -374,50 +406,56 @@ export const landingPage = {
     description: "Predictable flat plans. No hidden per-message markups.",
     plans: [
       {
-        name: "Starter",
-        description: "For single-location businesses moving beyond manual chats.",
-        price: "Rp 499.000",
-        period: "/ month",
+        category: "AI AGENT",
+        name: "Diuk Standard",
+        description: "WhatsApp AI Agent Customer Service",
+        price: "IDR 299.000",
+        period: "/month",
+        setupFee: "IDR 3.000.000,00",
         featured: false,
-        cta: "Get Starter",
+        cta: "Get Standard",
         features: [
-          "1 WhatsApp Official Number",
-          "Up to 1,500 AI conversations",
-          "Basic Lead CRM & Contact Tags",
-          "Google Calendar 1-Way Sync",
+          "24 jam AI kerja",
+          "AI responses 25k / month",
+          "Basic CRM Integration",
+          "Dashboard Customer Service",
+          "Smart Broadcast",
         ],
       },
       {
-        name: "Growth",
-        description:
-          "For scaling clinics, salons, and hospitality with high chat volume.",
-        price: "Rp 1.299.000",
-        period: "/ month",
+        category: "AI AGENT",
+        name: "Diuk Plus",
+        description: "Multi-channel AI WhatsApp + Instagram",
+        price: "IDR 499.000",
+        period: "/month",
+        setupFee: "IDR 4.000.000,00",
         featured: true,
         badge: "Most Popular",
-        cta: "Start Free 14-Day Trial",
+        cta: "Get Plus",
         features: [
-          "WhatsApp + Instagram Direct Unified",
-          "Up to 5,000 AI conversations",
-          "Smart Reservation & Slot Allocation",
-          "Automated H-2h Reminder & Follow-up",
-          "Multi-Agent Human Handover",
+          "24 jam AI kerja",
+          "AI responses 50k / month",
+          "Advanced CRM Integration",
+          "Dashboard Customer Service",
+          "Smart Broadcast",
         ],
       },
       {
-        name: "Enterprise",
-        description:
-          "For multi-branch chains and high-velocity hospitality networks.",
-        price: "Rp 3.499.000",
-        period: "/ month",
+        category: "AI AGENT",
+        name: "Diuk Pro",
+        description: "AI Agent + Reservation + Website Profile",
+        price: "IDR 599.000",
+        period: "/month",
+        setupFee: "IDR 6.000.000,00",
         featured: false,
-        cta: "Contact Enterprise Sales",
+        cta: "Get Pro",
         features: [
-          "Unlimited WhatsApp, IG & Web",
-          "Custom AI Knowledge Training",
-          "Multi-branch Central Command",
-          "Custom POS & ERP Webhooks",
-          "Dedicated Account Manager & 99.8% SLA",
+          "24 jam AI kerja",
+          "AI responses 50k / month",
+          "Advanced CRM Integration",
+          "Dashboard Customer Service",
+          "Smart Broadcast",
+          "Smart Reservation System + Website Profile",
         ],
       },
     ],

@@ -1,6 +1,6 @@
 export { Header } from "./header";
 export { Hero } from "./hero";
-export { TrustBar } from "./trust-bar";
+export { BrandsMarquee } from "./brands-marquee";
 export { Problem } from "./problem";
 export { Workflow } from "./workflow";
 export { Features } from "./features";

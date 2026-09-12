@@ -1,5 +1,8 @@
+"use client";
+
 import { landingPage } from "@/data/landing-page";
 import { SectionHeading } from "@/components/landing/section-heading";
+import { CountUp, Stagger, StaggerItem } from "@/components/landing/motion";
 
 export function Impact() {
   const { impact } = landingPage;
@@ -14,15 +17,15 @@ export function Impact() {
           className="mx-auto mb-14 max-w-3xl text-center"
         />
 
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+        <Stagger className="grid grid-cols-1 gap-8 md:grid-cols-3">
           {impact.stats.map((stat) => (
-            <div
+            <StaggerItem
               key={stat.title}
               className="flex flex-col justify-between rounded-2xl border border-outline-variant bg-surface-container-low p-8 text-center"
             >
               <div>
                 <div className="mb-2 text-6xl font-bold tracking-tight text-primary-dark">
-                  {stat.value}
+                  <CountUp value={stat.value} />
                 </div>
                 <h3 className="mb-2 text-lg font-bold text-on-surface">
                   {stat.title}
@@ -31,9 +34,9 @@ export function Impact() {
                   {stat.description}
                 </p>
               </div>
-            </div>
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       </div>
     </section>
   );

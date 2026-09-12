@@ -1,6 +1,9 @@
+"use client";
+
 import { landingPage } from "@/data/landing-page";
 import { Icon } from "@/components/ui/icon";
 import { SectionHeading } from "@/components/landing/section-heading";
+import { Stagger, StaggerItem } from "@/components/landing/motion";
 
 export function Pricing() {
   const { pricing } = landingPage;
@@ -19,13 +22,13 @@ export function Pricing() {
           className="mx-auto mb-12 max-w-3xl text-center"
         />
 
-        <div className="mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-8 lg:grid-cols-3">
+        <Stagger className="mx-auto grid max-w-6xl grid-cols-1 items-stretch gap-8 lg:grid-cols-3">
           {pricing.plans.map((plan) => (
-            <div
+            <StaggerItem
               key={plan.name}
               className={`relative flex flex-col justify-between rounded-2xl p-6 sm:p-8 ${
                 plan.featured
-                  ? "border-2 border-primary bg-white shadow-xl"
+                  ? "border-2 border-primary bg-white shadow-xl lg:scale-[1.03]"
                   : "border border-outline-variant bg-surface-container-low"
               }`}
             >
@@ -35,6 +38,9 @@ export function Pricing() {
                 </div>
               ) : null}
               <div>
+                <span className="mb-1 block font-mono text-[10px] font-bold tracking-wider text-on-surface-variant uppercase">
+                  {plan.category}
+                </span>
                 <h3 className="mb-1 text-lg font-bold text-on-surface">
                   {plan.name}
                 </h3>
@@ -49,7 +55,7 @@ export function Pricing() {
                     {plan.period}
                   </span>
                 </div>
-                <ul className="mb-8 space-y-2.5 font-sans text-xs text-on-surface">
+                <ul className="mb-6 space-y-2.5 font-sans text-xs text-on-surface">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
                       <Icon
@@ -60,6 +66,14 @@ export function Pricing() {
                     </li>
                   ))}
                 </ul>
+                <div className="mb-8 rounded-lg border border-outline-variant bg-white px-3 py-2.5">
+                  <span className="block font-mono text-[10px] text-on-surface-variant">
+                    Setup fee
+                  </span>
+                  <span className="text-sm font-bold text-on-surface">
+                    {plan.setupFee}
+                  </span>
+                </div>
               </div>
               <a
                 href="#"
@@ -71,9 +85,9 @@ export function Pricing() {
               >
                 {plan.cta}
               </a>
-            </div>
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       </div>
     </section>
   );

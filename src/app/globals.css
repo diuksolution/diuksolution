@@ -101,3 +101,20 @@ body {
 .animate-login-float-delayed {
   animation: login-float 7s ease-in-out infinite 1.5s;
 }
+
+@keyframes brands-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-brands-marquee {
+  animation: brands-marquee 32s linear infinite;
+}
+
+.animate-brands-marquee-reverse {
+  animation: brands-marquee 38s linear infinite reverse;
+}

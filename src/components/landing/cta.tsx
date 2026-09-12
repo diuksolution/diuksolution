@@ -1,5 +1,8 @@
+"use client";
+
 import { landingPage } from "@/data/landing-page";
 import { Icon } from "@/components/ui/icon";
+import { Reveal } from "@/components/landing/motion";
 
 export function Cta() {
   const { cta } = landingPage;
@@ -8,7 +11,7 @@ export function Cta() {
     <section className="relative w-full overflow-hidden bg-secondary py-20 text-white">
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12">
-          <div className="lg:col-span-7">
+          <Reveal className="lg:col-span-7">
             <span className="mb-2 block font-mono text-xs font-bold tracking-wider text-primary-light uppercase">
               {cta.eyebrow}
             </span>
@@ -34,37 +37,39 @@ export function Cta() {
                 <span>{cta.secondaryCta.label}</span>
               </a>
             </div>
-          </div>
+          </Reveal>
 
-          <div className="rounded-2xl border border-primary/30 bg-white p-5 text-on-surface shadow-2xl lg:col-span-5">
-            <div className="mb-3 flex items-center justify-between border-b border-border pb-3 font-mono text-xs">
-              <span className="flex items-center gap-1.5 font-bold text-success">
-                <Icon name="check_circle" className="text-base" /> Verified
-                WhatsApp Business
-              </span>
-              <span className="text-text-muted">16:02 WIB</span>
-            </div>
-            <div className="space-y-2 font-sans text-xs">
-              <p className="font-medium text-on-surface">
-                &quot;Terima kasih Kak Siti! Deposit reservasi telah diterima
-                via QRIS.&quot;
-              </p>
-              <div className="space-y-1 rounded-lg border border-outline-variant bg-surface-container-low p-3 font-mono text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Booking:</span>
-                  <span className="font-bold text-on-surface">
-                    Acne Laser • Dr. Nadia
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Status:</span>
-                  <span className="font-bold text-success">
-                    PAID & LOCKED
-                  </span>
+          <Reveal delay={0.15} className="lg:col-span-5">
+            <div className="rounded-2xl border border-primary/30 bg-white p-5 text-on-surface shadow-2xl">
+              <div className="mb-3 flex items-center justify-between border-b border-border pb-3 font-mono text-xs">
+                <span className="flex items-center gap-1.5 font-bold text-success">
+                  <Icon name="check_circle" className="text-base" /> Verified
+                  WhatsApp Business
+                </span>
+                <span className="text-text-muted">16:02 WIB</span>
+              </div>
+              <div className="space-y-2 font-sans text-xs">
+                <p className="font-medium text-on-surface">
+                  &quot;Terima kasih Kak Siti! Deposit reservasi telah diterima
+                  via QRIS.&quot;
+                </p>
+                <div className="space-y-1 rounded-lg border border-outline-variant bg-surface-container-low p-3 font-mono text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">Booking:</span>
+                    <span className="font-bold text-on-surface">
+                      Acne Laser • Dr. Nadia
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">Status:</span>
+                    <span className="font-bold text-success">
+                      PAID & LOCKED
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>

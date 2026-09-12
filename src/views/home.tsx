@@ -1,4 +1,5 @@
 import {
+  BrandsMarquee,
   Cta,
   Dashboard,
   Features,
@@ -10,7 +11,6 @@ import {
   Problem,
   Solutions,
   Testimonials,
-  TrustBar,
   Workflow,
 } from "@/components/landing";
 
@@ -20,7 +20,7 @@ export function HomeView() {
       <Header />
       <main className="w-full pt-16">
         <Hero />
-        <TrustBar />
+        <BrandsMarquee />
         <Problem />
         <Workflow />
         <Features />

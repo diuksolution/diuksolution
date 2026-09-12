@@ -1,5 +1,8 @@
+"use client";
+
 import { landingPage } from "@/data/landing-page";
 import { SectionHeading } from "@/components/landing/section-heading";
+import { Stagger, StaggerItem } from "@/components/landing/motion";
 
 const avatarTones = {
   teal: "bg-primary/15 text-primary-dark",
@@ -18,9 +21,9 @@ export function Testimonials() {
           title={testimonials.title}
         />
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <Stagger className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {testimonials.items.map((item) => (
-            <div
+            <StaggerItem
               key={item.name}
               className="flex flex-col justify-between rounded-2xl border border-outline-variant bg-white p-6 shadow-sm"
             >
@@ -42,9 +45,9 @@ export function Testimonials() {
                   <p className="text-xs text-on-surface-variant">{item.role}</p>
                 </div>
               </div>
-            </div>
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       </div>
     </section>
   );
