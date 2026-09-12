@@ -149,7 +149,7 @@ export function Hero() {
         </div>
       </div>
 
-      <div className="relative z-20 -mt-[100svh] py-12">
+      <div className="relative z-20 md:-mt-[100svh] -mt-[80svh] py-12">
         <div className="mx-auto flex max-w-7xl flex-col items-center px-4 pt-[clamp(22rem,52vh,34rem)] pb-16 sm:px-6 sm:pt-[clamp(24rem,54vh,36rem)] sm:pb-20 lg:px-8">
           <HeroSimulation scrollYProgress={scrollYProgress} />
         </div>
