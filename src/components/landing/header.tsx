@@ -8,7 +8,9 @@ import { Icon } from "@/components/ui/icon";
 export function Header() {
   const { header } = landingPage;
   const [open, setOpen] = useState(false);
-  const [activeHref, setActiveHref] = useState(header.navItems[0]?.href ?? "");
+  const [activeHref, setActiveHref] = useState<string>(
+    header.navItems[0]?.href ?? "",
+  );
 
   useEffect(() => {
     const sectionIds = header.navItems
