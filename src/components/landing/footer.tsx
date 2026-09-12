@@ -1,8 +1,9 @@
 import Image from "next/image";
 import { landingPage } from "@/data/landing-page";
+import { buildWhatsAppUrl } from "@/lib/landing/whatsapp";
 
 export function Footer() {
-  const { footer, header } = landingPage;
+  const { footer, header, contact } = landingPage;
 
   return (
     <footer className="w-full border-t border-outline-variant bg-white py-12">
@@ -20,6 +21,30 @@ export function Footer() {
             <p className="mb-4 max-w-sm text-xs text-on-surface-variant">
               {footer.description}
             </p>
+            <div className="mb-4 space-y-2 text-xs text-on-surface-variant">
+              <a
+                href={buildWhatsAppUrl(
+                  "Halo DIUK, saya ingin bertanya tentang DIUK Solution.",
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 hover:text-on-surface"
+              >
+                <span className="font-mono text-[10px] tracking-wider uppercase">
+                  WA
+                </span>
+                <span>{contact.whatsapp.display}</span>
+              </a>
+              <a
+                href={contact.email.href}
+                className="flex items-center gap-2 hover:text-on-surface"
+              >
+                <span className="font-mono text-[10px] tracking-wider uppercase">
+                  Email
+                </span>
+                <span>{contact.email.display}</span>
+              </a>
+            </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-outline-variant bg-surface-container-low px-3 py-1 font-mono text-[11px] text-on-surface-variant">
               <span className="relative overflow-hidden rounded-sm border border-gray-300">
                 <span className="block h-1.5 w-3.5 bg-red-600" />

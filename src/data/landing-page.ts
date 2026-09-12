@@ -1,4 +1,14 @@
 export const landingPage = {
+  contact: {
+    whatsapp: {
+      display: "+62 881-0806-19084",
+      phone: "62881080619084",
+    },
+    email: {
+      display: "diuk.solution@gmail.com",
+      href: "mailto:diuk.solution@gmail.com",
+    },
+  },
   header: {
     logo: {
       src: "/logo.png",
@@ -414,6 +424,8 @@ export const landingPage = {
         setupFee: "IDR 3.000.000,00",
         featured: false,
         cta: "Get Standard",
+        waMessage:
+          "Halo DIUK, saya tertarik dengan paket *Diuk Standard* (IDR 299.000/bulan). Mohon info lebih lanjut ya.",
         features: [
           "24 jam AI kerja",
           "AI responses 25k / month",
@@ -432,6 +444,8 @@ export const landingPage = {
         featured: true,
         badge: "Most Popular",
         cta: "Get Plus",
+        waMessage:
+          "Halo DIUK, saya tertarik dengan paket *Diuk Plus* (IDR 499.000/bulan). Mohon info lebih lanjut ya.",
         features: [
           "24 jam AI kerja",
           "AI responses 50k / month",
@@ -449,6 +463,8 @@ export const landingPage = {
         setupFee: "IDR 6.000.000,00",
         featured: false,
         cta: "Get Pro",
+        waMessage:
+          "Halo DIUK, saya tertarik dengan paket *Diuk Pro* (IDR 599.000/bulan). Mohon info lebih lanjut ya.",
         features: [
           "24 jam AI kerja",
           "AI responses 50k / month",
@@ -465,8 +481,16 @@ export const landingPage = {
     title: "Your next customer is already in the conversation.",
     description:
       "Let DIUK handle the conversation so your team can focus on in-store hospitality.",
-    primaryCta: { label: "Start with DIUK", href: "#pricing" },
-    secondaryCta: { label: "Schedule 1-on-1 Consultation", href: "#pricing" },
+    primaryCta: {
+      label: "Start with DIUK",
+      waMessage:
+        "Halo DIUK, saya ingin mulai menggunakan DIUK Solution. Mohon dibantu proses selanjutnya ya.",
+    },
+    secondaryCta: {
+      label: "Schedule 1-on-1 Consultation",
+      waMessage:
+        "Halo DIUK, saya ingin menjadwalkan konsultasi 1-on-1. Mohon info slot yang tersedia.",
+    },
   },
   footer: {
     description:

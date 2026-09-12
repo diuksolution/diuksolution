@@ -17,7 +17,7 @@ export function BrandsMarquee() {
   ];
 
   return (
-    <section className="relative w-full overflow-hidden border-y border-outline-variant bg-linear-to-b from-white via-surface-container-low/40 to-white py-12">
+    <section className="relative z-20 w-full overflow-hidden border-y border-outline-variant bg-linear-to-b from-white via-surface-container-low/40 to-white py-12">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-40"

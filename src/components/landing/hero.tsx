@@ -1,7 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useScroll, useTransform } from "framer-motion";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  type MotionValue,
+} from "framer-motion";
 import { useRef } from "react";
 import { landingPage } from "@/data/landing-page";
 import { Icon } from "@/components/ui/icon";
@@ -11,110 +16,143 @@ const ease = [0.22, 1, 0.36, 1] as const;
 
 export function Hero() {
   const { hero } = landingPage;
+  const sectionRef = useRef<HTMLElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  });
+
+  const copyOpacity = useTransform(scrollYProgress, [0, 0.18, 0.32], [1, 0.35, 0]);
+  const copyScale = useTransform(scrollYProgress, [0, 0.32], [1, 0.96]);
+  const copyBlur = useTransform(scrollYProgress, [0, 0.32], [0, 8]);
+  const copyFilter = useTransform(copyBlur, (value) => `blur(${value}px)`);
+  const copyPointerEvents = useTransform(copyOpacity, (value) =>
+    value < 0.15 ? "none" : "auto",
+  );
 
   return (
-    <section className="relative w-full overflow-hidden bg-background pt-24 pb-16 sm:pt-28 sm:pb-20">
-      <HeroAtmosphere />
+    <section ref={sectionRef} className="relative w-full">
+      <div className="sticky top-0 h-svh overflow-hidden bg-background">
+        <HeroAtmosphere />
 
-      <div className="relative z-10 mx-auto flex max-w-7xl flex-col items-center px-4 text-center sm:px-6 lg:px-8">
-        <motion.div
-          className="mb-4 inline-flex items-center gap-2 rounded-full border border-outline-variant/80 bg-white/80 px-3 py-1 shadow-xs backdrop-blur-sm"
-          initial={{ opacity: 0, y: 14, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.5, ease }}
-        >
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-          </span>
-          <span className="font-mono text-xs font-medium tracking-tight text-on-surface-variant">
-            {hero.badge}
-          </span>
-        </motion.div>
-
-        <motion.p
-          className="mb-3 font-mono text-[11px] font-bold tracking-[0.35em] text-secondary uppercase"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.08, ease }}
-        >
-          {hero.brand}
-        </motion.p>
-
-        <h1 className="mb-5 max-w-4xl text-4xl leading-[1.08] font-bold tracking-tight text-on-surface sm:text-5xl lg:text-[60px]">
-          <FadeWords text={hero.headline} />{" "}
-          <motion.span
-            className="relative inline-block text-primary-dark"
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.32, ease }}
+        <div className="relative z-10 mx-auto flex h-full max-w-7xl flex-col items-center px-4 pt-24 text-center sm:px-6 sm:pt-28 lg:px-8">
+          <motion.div
+            style={{
+              opacity: copyOpacity,
+              scale: copyScale,
+              filter: copyFilter,
+              pointerEvents: copyPointerEvents,
+            }}
+            className="flex w-full flex-col items-center will-change-transform"
           >
-            {hero.headlineAccent}
-            <motion.span
-              aria-hidden
-              className="absolute right-0 -bottom-1 left-0 h-1 origin-left rounded-full bg-linear-to-r from-primary via-primary-light to-secondary/40"
-              initial={{ scaleX: 0 }}
-              animate={{ scaleX: 1 }}
-              transition={{ duration: 0.7, delay: 0.55, ease }}
-            />
-          </motion.span>
-        </h1>
+            <motion.div
+              className="mb-4 inline-flex items-center gap-2 rounded-full border border-outline-variant/80 bg-white/80 px-3 py-1 shadow-xs backdrop-blur-sm"
+              initial={{ opacity: 0, y: 14, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.5, ease }}
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+              <span className="font-mono text-xs font-medium tracking-tight text-on-surface-variant">
+                {hero.badge}
+              </span>
+            </motion.div>
 
-        <motion.p
-          className="mb-7 max-w-2xl text-base text-on-surface-variant sm:text-lg"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.38, ease }}
-        >
-          {hero.subtitle}
-        </motion.p>
+            <motion.p
+              className="mb-3 font-mono text-[11px] font-bold tracking-[0.35em] text-secondary uppercase"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.08, ease }}
+            >
+              {hero.brand}
+            </motion.p>
 
-        <motion.div
-          className="mb-5 flex w-full max-w-md flex-col items-center justify-center gap-3 sm:flex-row"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.46, ease }}
-        >
-          <a
-            href={hero.primaryCta.href}
-            className="group flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_-12px_rgba(101,147,58,0.7)] transition-all hover:bg-primary-dark hover:shadow-[0_14px_34px_-12px_rgba(101,147,58,0.85)] sm:w-auto"
-          >
-            <span>{hero.primaryCta.label}</span>
-            <Icon
-              name="arrow_forward"
-              className="text-base transition-transform group-hover:translate-x-0.5"
-            />
-          </a>
-          <a
-            href={hero.secondaryCta.href}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-outline-variant bg-white/90 px-5 py-3 text-sm font-semibold text-on-surface shadow-xs backdrop-blur-sm transition-colors hover:bg-surface-container-low sm:w-auto"
-          >
-            <Icon name="play_circle" className="text-lg text-primary-dark" />
-            <span>{hero.secondaryCta.label}</span>
-          </a>
-        </motion.div>
-
-        <motion.div
-          className="mb-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-[11px] text-on-surface-variant"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.45, delay: 0.58 }}
-        >
-          {hero.signals.map((signal, index) => (
-            <span key={signal.label} className="inline-flex items-center gap-1.5">
-              {index > 0 ? (
-                <span
+            <h1 className="mb-5 max-w-4xl text-4xl leading-[1.08] font-bold tracking-tight text-on-surface sm:text-5xl lg:text-[60px]">
+              <FadeWords text={hero.headline} />{" "}
+              <motion.span
+                className="relative inline-block text-primary-dark"
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, delay: 0.32, ease }}
+              >
+                {hero.headlineAccent}
+                <motion.span
                   aria-hidden
-                  className="mr-2.5 hidden h-1 w-1 rounded-full bg-outline-variant sm:inline-block"
+                  className="absolute right-0 -bottom-1 left-0 h-1 origin-left rounded-full bg-linear-to-r from-primary via-primary-light to-secondary/40"
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: 0.7, delay: 0.55, ease }}
                 />
-              ) : null}
-              <Icon name={signal.icon} className="text-sm text-primary-dark" />
-              {signal.label}
-            </span>
-          ))}
-        </motion.div>
+              </motion.span>
+            </h1>
 
-        <HeroSimulation />
+            <motion.p
+              className="mb-7 max-w-2xl text-base text-on-surface-variant sm:text-lg"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.38, ease }}
+            >
+              {hero.subtitle}
+            </motion.p>
+
+            <motion.div
+              className="mb-5 flex w-full max-w-md flex-col items-center justify-center gap-3 sm:flex-row"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.46, ease }}
+            >
+              <a
+                href={hero.primaryCta.href}
+                className="group flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_-12px_rgba(101,147,58,0.7)] transition-all hover:bg-primary-dark hover:shadow-[0_14px_34px_-12px_rgba(101,147,58,0.85)] sm:w-auto"
+              >
+                <span>{hero.primaryCta.label}</span>
+                <Icon
+                  name="arrow_forward"
+                  className="text-base transition-transform group-hover:translate-x-0.5"
+                />
+              </a>
+              <a
+                href={hero.secondaryCta.href}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-outline-variant bg-white/90 px-5 py-3 text-sm font-semibold text-on-surface shadow-xs backdrop-blur-sm transition-colors hover:bg-surface-container-low sm:w-auto"
+              >
+                <Icon name="play_circle" className="text-lg text-primary-dark" />
+                <span>{hero.secondaryCta.label}</span>
+              </a>
+            </motion.div>
+
+            <motion.div
+              className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-[11px] text-on-surface-variant"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.45, delay: 0.58 }}
+            >
+              {hero.signals.map((signal, index) => (
+                <span
+                  key={signal.label}
+                  className="inline-flex items-center gap-1.5"
+                >
+                  {index > 0 ? (
+                    <span
+                      aria-hidden
+                      className="mr-2.5 hidden h-1 w-1 rounded-full bg-outline-variant sm:inline-block"
+                    />
+                  ) : null}
+                  <Icon name={signal.icon} className="text-sm text-primary-dark" />
+                  {signal.label}
+                </span>
+              ))}
+            </motion.div>
+          </motion.div>
+        </div>
+      </div>
+
+      <div className="relative z-20 -mt-[100svh] py-12">
+        <div className="mx-auto flex max-w-7xl flex-col items-center px-4 pt-[clamp(22rem,52vh,34rem)] pb-16 sm:px-6 sm:pt-[clamp(24rem,54vh,36rem)] sm:pb-20 lg:px-8">
+          <HeroSimulation scrollYProgress={scrollYProgress} />
+        </div>
       </div>
     </section>
   );
@@ -156,33 +194,31 @@ function HeroAtmosphere() {
   );
 }
 
-function HeroSimulation() {
+function HeroSimulation({
+  scrollYProgress,
+}: {
+  scrollYProgress: MotionValue<number>;
+}) {
   const { simulation } = landingPage.hero;
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start end", "end start"],
-  });
 
   const scale = useTransform(
     scrollYProgress,
-    [0, 0.35, 0.55, 1],
-    [0.9, 1, 1, 0.92],
+    [0, 0.22, 0.45, 0.75],
+    [0.9, 1.06, 1.06, 1],
   );
   const y = useTransform(
     scrollYProgress,
-    [0, 0.35, 0.55, 1],
-    [56, 0, 0, -28],
+    [0, 0.22, 0.45, 0.75],
+    [40, 0, 0, -20],
   );
   const rotateX = useTransform(
     scrollYProgress,
-    [0, 0.35, 0.55, 1],
+    [0, 0.22, 0.45, 0.75],
     [8, 0, 0, -2],
   );
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-6xl perspective-[1400px]">
+    <div className="relative w-full max-w-6xl perspective-[1400px]">
       <motion.div
         aria-hidden
         className="absolute top-1/2 left-1/2 h-[70%] w-[88%] -translate-x-1/2 -translate-y-1/2 rounded-[40%] bg-linear-to-r from-secondary/25 via-primary/30 to-primary-light/25 blur-3xl"
@@ -192,8 +228,8 @@ function HeroSimulation() {
 
       <motion.div
         style={{ scale, y, rotateX, transformPerspective: 1400 }}
-        initial={{ opacity: 0, y: 40, scale: 0.94 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.75, delay: 0.35, ease }}
         className="relative origin-center overflow-hidden rounded-2xl border border-white/70 bg-white text-left shadow-[0_30px_80px_-28px_rgba(32,38,92,0.45)] will-change-transform"
       >

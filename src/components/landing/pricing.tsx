@@ -4,6 +4,7 @@ import { landingPage } from "@/data/landing-page";
 import { Icon } from "@/components/ui/icon";
 import { SectionHeading } from "@/components/landing/section-heading";
 import { Stagger, StaggerItem } from "@/components/landing/motion";
+import { buildWhatsAppUrl } from "@/lib/landing/whatsapp";
 
 export function Pricing() {
   const { pricing } = landingPage;
@@ -76,7 +77,9 @@ export function Pricing() {
                 </div>
               </div>
               <a
-                href="#"
+                href={buildWhatsAppUrl(plan.waMessage)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={`rounded-lg py-2.5 text-center text-xs font-semibold transition-all ${
                   plan.featured
                     ? "bg-primary text-white shadow-xs hover:bg-primary-dark"

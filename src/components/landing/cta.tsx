@@ -3,6 +3,7 @@
 import { landingPage } from "@/data/landing-page";
 import { Icon } from "@/components/ui/icon";
 import { Reveal } from "@/components/landing/motion";
+import { buildWhatsAppUrl } from "@/lib/landing/whatsapp";
 
 export function Cta() {
   const { cta } = landingPage;
@@ -23,14 +24,18 @@ export function Cta() {
             </p>
             <div className="flex flex-col items-center gap-3 sm:flex-row">
               <a
-                href={cta.primaryCta.href}
+                href={buildWhatsAppUrl(cta.primaryCta.waMessage)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-primary-dark sm:w-auto"
               >
                 <span>{cta.primaryCta.label}</span>
                 <Icon name="arrow_forward" className="text-base" />
               </a>
               <a
-                href={cta.secondaryCta.href}
+                href={buildWhatsAppUrl(cta.secondaryCta.waMessage)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/20 bg-secondary-light/50 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-secondary-light sm:w-auto"
               >
                 <Icon name="calendar_today" className="text-base" />
