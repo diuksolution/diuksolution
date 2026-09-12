@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "DIUK Solution - Conversational AI & Automation Platform",
   description:
     "AI-powered customer conversations, sales, and reservations for growing businesses.",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
