@@ -18,7 +18,7 @@ export function HomeView() {
   return (
     <>
       <Header />
-      <main className="w-full pt-16">
+      <main className="w-full">
         <Hero />
         <BrandsMarquee />
         <Problem />

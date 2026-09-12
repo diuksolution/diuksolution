@@ -13,7 +13,7 @@ export function Hero() {
   const { hero } = landingPage;
 
   return (
-    <section className="relative w-full overflow-hidden bg-background pt-10 pb-16 sm:pt-14 sm:pb-20">
+    <section className="relative w-full overflow-hidden bg-background pt-24 pb-16 sm:pt-28 sm:pb-20">
       <HeroAtmosphere />
 
       <div className="relative z-10 mx-auto flex max-w-7xl flex-col items-center px-4 text-center sm:px-6 lg:px-8">
