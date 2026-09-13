@@ -13,11 +13,27 @@ import {
   listConnectedDoctors,
 } from "@/lib/booking/availability";
 import { createDoctorBooking } from "@/lib/booking/create";
+import { listActiveServices } from "@/lib/services";
+import { formatIdr } from "@/lib/services/format";
 import { sendWhatsAppText } from "@/lib/whatsapp/send";
+
+const TOOLS_HINT = `
+
+Tools wajib:
+- list_services untuk harga / daftar treatment (jangan mengarang harga).
+- list_doctors, check_availability, book_appointment untuk jadwal.
+- Saat booking utamakan serviceId dari list_services.`;
 
 function looksLikeBookingIntent(text: string) {
   const value = text.toLowerCase();
   return /(book|booking|jadwal|janji|reservasi|appointment|mau (datang|ketemu)|konsultasi|facial|treatment|dokter)/i.test(
+    value,
+  );
+}
+
+function looksLikeServiceIntent(text: string) {
+  const value = text.toLowerCase();
+  return /(harga|pricelist|price|biaya|tarif|layanan|treatment|paket|dp\b|down ?payment|pico|facial|laser)/i.test(
     value,
   );
 }
@@ -31,12 +47,58 @@ function formatSlotList(
     .join("\n");
 }
 
+function formatServiceList(
+  services: Array<{
+    name: string;
+    price: number;
+    dpAmount: number;
+    durationMin: number | null;
+  }>,
+) {
+  return services
+    .map((service, index) => {
+      const dp =
+        service.dpAmount > 0 ? ` · DP ${formatIdr(service.dpAmount)}` : "";
+      const duration = service.durationMin
+        ? ` · ${service.durationMin} mnt`
+        : "";
+      return `${index + 1}. ${service.name} — ${formatIdr(service.price)}${dp}${duration}`;
+    })
+    .join("\n");
+}
+
+function matchServiceFromText(
+  text: string,
+  services: Array<{
+    id: string;
+    name: string;
+    price: number;
+    dpAmount: number;
+    durationMin: number | null;
+  }>,
+) {
+  const lower = text.toLowerCase();
+  return (
+    services.find((item) => lower.includes(item.name.toLowerCase())) ?? null
+  );
+}
+
 async function runRuleBasedBooking(input: {
   businessId: string;
   contactId: string;
   customerName?: string | null;
   text: string;
 }) {
+  const services = await listActiveServices(input.businessId);
+  const matchedService = matchServiceFromText(input.text, services);
+
+  if (looksLikeServiceIntent(input.text) && !looksLikeBookingIntent(input.text)) {
+    if (services.length === 0) {
+      return "Katalog layanan belum diisi admin. Tim kami akan bantu info harga manual ya.";
+    }
+    return `Ini layanan aktif di klinik kami:\n\n${formatServiceList(services)}\n\nMau booking yang mana, Kak?`;
+  }
+
   const doctors = await listConnectedDoctors(input.businessId);
   if (doctors.length === 0) {
     return "Saat ini belum ada dokter dengan Google Calendar yang terhubung. Tim kami akan bantu manual ya.";
@@ -47,24 +109,38 @@ async function runRuleBasedBooking(input: {
   }
 
   const chooseMatch = input.text.match(/\b([1-5])\b/);
+  const durationMinutes = matchedService?.durationMin ?? 60;
   const slots = await findAvailableSlots({
     businessId: input.businessId,
     daysAhead: 7,
+    durationMinutes,
   });
 
   if (chooseMatch && slots.length > 0) {
     const index = Number(chooseMatch[1]) - 1;
     const selected = slots[index];
     if (selected) {
+      const serviceName = matchedService?.name || services[0]?.name || "Konsultasi";
       const booking = await createDoctorBooking({
         businessId: input.businessId,
         contactId: input.contactId,
         doctorId: selected.doctorId,
         startIso: selected.start,
-        service: "Konsultasi",
+        service: serviceName,
+        serviceId: matchedService?.id ?? services[0]?.id,
+        amount: matchedService?.price ?? services[0]?.price,
+        durationMinutes,
         customerName: input.customerName ?? undefined,
       });
-      return `Baik, booking sudah dikonfirmasi ✅\n\nDokter: ${booking.doctorName}\nLayanan: ${booking.service}\nWaktu: ${selected.label}\n\nSampai jumpa di klinik ya.`;
+      const priceLine =
+        booking.amount > 0
+          ? `\nHarga: ${formatIdr(booking.amount)}${
+              matchedService && matchedService.dpAmount > 0
+                ? ` (DP ${formatIdr(matchedService.dpAmount)})`
+                : ""
+            }`
+          : "";
+      return `Baik, booking sudah dikonfirmasi ✅\n\nDokter: ${booking.doctorName}\nLayanan: ${booking.service}\nWaktu: ${selected.label}${priceLine}\n\nSampai jumpa di klinik ya.`;
     }
   }
 
@@ -72,7 +148,13 @@ async function runRuleBasedBooking(input: {
     return `Dokter tersedia: ${doctors.map((d) => d.name).join(", ")}.\nSaat ini belum ada slot kosong 7 hari ke depan. Mau coba tanggal lain?`;
   }
 
-  return `Bisa Kak. Ini slot terdekat dari dokter yang calendar-nya sudah terhubung:\n\n${formatSlotList(slots)}\n\nBalas angka (1-${Math.min(5, slots.length)}) untuk booking, atau sebutkan preferensi hari/jam.`;
+  const serviceHint = matchedService
+    ? ` untuk ${matchedService.name}`
+    : services.length > 0
+      ? ""
+      : "";
+
+  return `Bisa Kak. Ini slot terdekat${serviceHint} dari dokter yang calendar-nya sudah terhubung:\n\n${formatSlotList(slots)}\n\nBalas angka (1-${Math.min(5, slots.length)}) untuk booking, atau sebutkan preferensi hari/jam.`;
 }
 
 async function runLlmBooking(input: {
@@ -87,10 +169,11 @@ async function runLlmBooking(input: {
   const history: LlmChatMessage[] = [
     {
       role: "system",
-      content: renderPromptTemplate(input.systemPrompt, {
-        business: input.businessName,
-        name: input.customerName?.trim() || "Kak",
-      }),
+      content:
+        renderPromptTemplate(input.systemPrompt, {
+          business: input.businessName,
+          name: input.customerName?.trim() || "Kak",
+        }) + TOOLS_HINT,
     },
     ...input.recentMessages.map((message) => ({
       role: (message.direction === "INBOUND" ? "user" : "assistant") as

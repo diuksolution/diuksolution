@@ -43,6 +43,11 @@ export function getClinicNav(unreadCount = 0): AdminNavSection[] {
           icon: "stethoscope",
           label: "Doctor List",
         },
+        {
+          href: "/admin/clinic/services",
+          icon: "medical_services",
+          label: "Services",
+        },
         { href: "/admin/clinic/schedules", icon: "schedule", label: "Schedules" },
       ],
     },

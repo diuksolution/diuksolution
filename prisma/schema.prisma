@@ -104,6 +104,7 @@ model Business {
   crmBookings     CrmBooking[]
   practitioners   Practitioner[]
   daySchedules    PractitionerDaySchedule[]
+  services        Service[]
   aiAutomation    AiAutomationSettings?
 }
 
@@ -207,6 +208,28 @@ model PractitionerDaySchedule {
   @@unique([practitionerId, date])
   @@index([businessId, date])
   @@index([practitionerId, date])
+}
+
+/// Catalog of billable treatments / packages per business (price source for AI + payments)
+model Service {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  /// Full price in IDR (rupiah, no decimals)
+  price       Int
+  /// Down-payment amount in IDR; 0 = DP not offered
+  dpAmount    Int      @default(0)
+  /// Optional estimated duration in minutes
+  durationMin Int?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([businessId, isActive])
+  @@index([businessId, sortOrder])
 }
 
 model Contact {

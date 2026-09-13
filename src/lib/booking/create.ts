@@ -7,6 +7,8 @@ export async function createDoctorBooking(input: {
   doctorId: string;
   startIso: string;
   service: string;
+  serviceId?: string;
+  amount?: number;
   durationMinutes?: number;
   notes?: string;
   customerName?: string;
@@ -27,6 +29,7 @@ export async function createDoctorBooking(input: {
 
   const contact = await prisma.contact.findFirst({
     where: { id: input.contactId, businessId: input.businessId },
+    select: { id: true, name: true, waId: true, lifecycle: true },
   });
 
   if (!contact) {
@@ -44,6 +47,10 @@ export async function createDoctorBooking(input: {
     input.customerName?.trim() ||
     contact.name?.trim() ||
     contact.waId;
+  const amount =
+    typeof input.amount === "number" && Number.isFinite(input.amount)
+      ? Math.max(0, Math.trunc(input.amount))
+      : 0;
 
   const event = await createCalendarEvent({
     practitioner: doctor,
@@ -52,6 +59,7 @@ export async function createDoctorBooking(input: {
       `Booked via DIUK WhatsApp AI`,
       `Customer: ${customerName}`,
       `Phone: +${contact.waId.replace(/^\+/, "")}`,
+      amount > 0 ? `Price: Rp ${amount.toLocaleString("id-ID")}` : null,
       input.notes ? `Notes: ${input.notes}` : null,
     ]
       .filter(Boolean)
@@ -69,6 +77,7 @@ export async function createDoctorBooking(input: {
       service: input.service,
       staffName: doctor.name,
       status: "BOOKED",
+      amount,
       scheduledAt: start,
       googleEventId: event.eventId,
       notes: input.notes ?? null,
@@ -94,6 +103,8 @@ export async function createDoctorBooking(input: {
     bookingId: booking.id,
     doctorName: doctor.name,
     service: input.service,
+    serviceId: input.serviceId ?? null,
+    amount,
     start: start.toISOString(),
     googleEventId: event.eventId,
     htmlLink: event.htmlLink,
