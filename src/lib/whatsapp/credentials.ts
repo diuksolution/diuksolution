@@ -176,10 +176,12 @@ export async function isValidWebhookSignature(
     return false;
   }
 
+  const signature = signatureHeader;
+
   function matches(secret: string) {
     const expected = `sha256=${createHmac("sha256", secret).update(rawBody).digest("hex")}`;
     const left = Buffer.from(expected);
-    const right = Buffer.from(signatureHeader);
+    const right = Buffer.from(signature);
     return left.length === right.length && timingSafeEqual(left, right);
   }
 
