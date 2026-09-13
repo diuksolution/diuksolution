@@ -379,22 +379,22 @@ export const landingPage = {
     title: "Trusted by growing businesses.",
     items: [
       {
-        quoteBefore: "DIUK increased our confirmed appointments by ",
-        quoteHighlight: "41% in our first month",
+        quoteBefore: "We can now handle orders 24/7 thanks to DIUK. ",
+        quoteHighlight: "No more missed requests",
         quoteAfter:
-          ". Front-desk staff no longer panic during lunch rush hours.",
-        initials: "AP",
-        name: "dr. Aris Pratama",
-        role: "Director, Dermacare Senopati",
+          "  and our CS is far more efficient.",
+        initials: "FA",
+        name: "Fadli Aliefinov",
+        role: "Manager, Kasiko Coffee",
         tone: "teal" as const,
       },
       {
-        quoteBefore: "Managing 5 barbershop branches on WhatsApp was chaos. DIUK handles our slot allocation ",
-        quoteHighlight: "without a single double-booking error",
+        quoteBefore: "DIUK helps us serve customers better. Fast, accurate replies keep people happy - ",
+        quoteHighlight: "revenue grew 30% after adopting it",
         quoteAfter: ".",
-        initials: "KW",
-        name: "Kevin Wibowo",
-        role: "Founder, BarberKings Group",
+        initials: "SA",
+        name: "Sultan Aziz P",
+        role: "Owner, Putri Melati Stationary",
         tone: "blue" as const,
       },
       {

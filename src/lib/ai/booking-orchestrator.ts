@@ -148,6 +148,7 @@ async function runLlmBooking(input: {
 
 async function persistOutboundReply(input: {
   conversationId: string;
+  businessId: string;
   waId: string;
   text: string;
   phoneNumberId?: string | null;
@@ -156,6 +157,7 @@ async function persistOutboundReply(input: {
     to: input.waId,
     text: input.text,
     phoneNumberId: input.phoneNumberId ?? undefined,
+    businessId: input.businessId,
   });
 
   const sentAt = new Date();
@@ -230,6 +232,7 @@ export async function handleInboundBookingAi(input: {
     if (welcome) {
       await persistOutboundReply({
         conversationId: input.conversationId,
+        businessId: input.businessId,
         waId: input.waId,
         text: welcome,
         phoneNumberId: input.phoneNumberId,
@@ -319,6 +322,7 @@ export async function handleInboundBookingAi(input: {
 
   await persistOutboundReply({
     conversationId: input.conversationId,
+    businessId: input.businessId,
     waId: input.waId,
     text: reply,
     phoneNumberId: input.phoneNumberId,

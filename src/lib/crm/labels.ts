@@ -55,10 +55,23 @@ export const FOLLOW_UP_TYPE_LABELS: Record<FollowUpType, string> = {
 
 export const BOOKING_STATUS_LABELS: Record<CrmBookingStatus, string> = {
   BOOKED: "Booked",
-  COMPLETED: "Completed",
   CANCELLED: "Cancelled",
-  NO_SHOW: "No-show",
+  DP: "DP",
+  PAID: "Paid",
+  DONE: "Done",
 };
+
+/** Statuses set automatically by booking/payment system. */
+export const SYSTEM_BOOKING_STATUSES: CrmBookingStatus[] = [
+  "BOOKED",
+  "CANCELLED",
+  "DP",
+  "PAID",
+];
+
+/** Only status staff can set manually from the appointments list. */
+export const MANUAL_BOOKING_STATUSES: CrmBookingStatus[] = ["DONE"];
+
 
 export const DEFAULT_TAGS = [
   { name: "VIP", color: "warning" },

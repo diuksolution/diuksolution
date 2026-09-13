@@ -1,7 +1,4 @@
-import {
-  getWhatsAppAccessToken,
-  getWhatsAppPhoneNumberId,
-} from "@/lib/whatsapp/signature";
+import { resolveSendCredentials } from "@/lib/whatsapp/credentials";
 
 const GRAPH_URL = "https://graph.facebook.com/v21.0";
 
@@ -9,13 +6,18 @@ export async function sendWhatsAppText(input: {
   to: string;
   text: string;
   phoneNumberId?: string;
+  businessId?: string;
 }) {
-  const token = getWhatsAppAccessToken();
-  const phoneNumberId = input.phoneNumberId || getWhatsAppPhoneNumberId();
+  const credentials = await resolveSendCredentials({
+    phoneNumberId: input.phoneNumberId,
+    businessId: input.businessId,
+  });
 
-  if (!token || !phoneNumberId) {
+  if (!credentials) {
     throw new Error("WhatsApp is not configured.");
   }
+
+  const { accessToken: token, phoneNumberId } = credentials;
 
   const response = await fetch(`${GRAPH_URL}/${phoneNumberId}/messages`, {
     method: "POST",

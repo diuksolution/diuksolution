@@ -78,19 +78,6 @@ async function main() {
     },
   });
 
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
-  if (phoneNumberId) {
-    await prisma.whatsAppNumber.upsert({
-      where: { phoneNumberId },
-      update: { businessId: clinic.id },
-      create: {
-        businessId: clinic.id,
-        phoneNumberId,
-      },
-    });
-    console.log(`WhatsApp number ${phoneNumberId} -> ${clinic.name}`);
-  }
-
   const doctorCount = await prisma.practitioner.count({
     where: { businessId: clinic.id },
   });

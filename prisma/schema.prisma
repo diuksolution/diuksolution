@@ -84,9 +84,10 @@ enum FollowUpStatus {
 
 enum CrmBookingStatus {
   BOOKED
-  COMPLETED
   CANCELLED
-  NO_SHOW
+  DP
+  PAID
+  DONE
 }
 
 model Business {
@@ -102,6 +103,7 @@ model Business {
   tags            Tag[]
   crmBookings     CrmBooking[]
   practitioners   Practitioner[]
+  daySchedules    PractitionerDaySchedule[]
   aiAutomation    AiAutomationSettings?
 }
 
@@ -124,14 +126,20 @@ model User {
 }
 
 model WhatsAppNumber {
-  id            String   @id @default(cuid())
-  businessId    String
-  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  phoneNumberId String   @unique
-  displayNumber String?
-  wabaId        String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  phoneNumberId   String   @unique
+  displayNumber   String?
+  wabaId          String?
+  /// Encrypted Meta permanent/system user token for this number
+  accessTokenEnc  String?  @db.Text
+  /// Encrypted Meta app secret (webhook signature) for this number's app
+  appSecretEnc    String?  @db.Text
+  /// Encrypted webhook verify token for this number's app
+  verifyTokenEnc  String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([businessId])
 }
@@ -172,11 +180,33 @@ model Practitioner {
   googleConnectedAt    DateTime?
   calendarSyncEnabled  Boolean   @default(false)
   bookings             CrmBooking[]
+  daySchedules         PractitionerDaySchedule[]
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
   @@index([businessId, isActive])
   @@index([businessId, name])
+}
+
+model PractitionerDaySchedule {
+  id             String       @id @default(cuid())
+  businessId     String
+  business       Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  practitionerId String
+  practitioner   Practitioner @relation(fields: [practitionerId], references: [id], onDelete: Cascade)
+  /// Calendar date (store as noon UTC to avoid TZ edge cases)
+  date           DateTime     @db.Date
+  startTime      String       @default("09:00")
+  endTime        String       @default("17:00")
+  /// Doctor unavailable / berhalangan hadir for this date
+  isOff          Boolean      @default(false)
+  note           String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([practitionerId, date])
+  @@index([businessId, date])
+  @@index([practitionerId, date])
 }
 
 model Contact {

@@ -2,7 +2,6 @@ import type { MessageDeliveryStatus } from "@prisma/client";
 import { handleInboundBookingAi } from "@/lib/ai/booking-orchestrator";
 import type { ParsedWhatsAppWebhook } from "@/lib/whatsapp/parse-webhook";
 import { prisma } from "@/lib/prisma";
-import { getWhatsAppPhoneNumberId } from "@/lib/whatsapp/signature";
 
 function previewText(type: string, text?: string) {
   if (text?.trim()) {
@@ -54,7 +53,7 @@ async function resolveWhatsAppNumber(input: {
   displayPhoneNumber?: string;
   wabaId?: string;
 }) {
-  const phoneNumberId = input.phoneNumberId || getWhatsAppPhoneNumberId();
+  const phoneNumberId = input.phoneNumberId?.trim();
   if (!phoneNumberId) {
     return null;
   }
@@ -63,27 +62,26 @@ async function resolveWhatsAppNumber(input: {
     where: { phoneNumberId },
   });
 
-  if (existing) {
-    return existing;
-  }
-
-  const clinic = await prisma.business.findFirst({
-    where: { businessType: "CLINIC" },
-    orderBy: { createdAt: "asc" },
-  });
-
-  if (!clinic) {
+  if (!existing) {
     return null;
   }
 
-  return prisma.whatsAppNumber.create({
-    data: {
-      businessId: clinic.id,
-      phoneNumberId,
-      displayNumber: input.displayPhoneNumber,
-      wabaId: input.wabaId,
-    },
-  });
+  // Keep display metadata fresh when Meta sends it
+  if (
+    (input.displayPhoneNumber &&
+      input.displayPhoneNumber !== existing.displayNumber) ||
+    (input.wabaId && input.wabaId !== existing.wabaId)
+  ) {
+    return prisma.whatsAppNumber.update({
+      where: { id: existing.id },
+      data: {
+        displayNumber: input.displayPhoneNumber ?? existing.displayNumber,
+        wabaId: input.wabaId ?? existing.wabaId,
+      },
+    });
+  }
+
+  return existing;
 }
 
 export async function ingestWhatsAppWebhook(parsed: ParsedWhatsAppWebhook) {

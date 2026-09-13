@@ -19,7 +19,7 @@ export function getClinicNav(unreadCount = 0): AdminNavSection[] {
       ],
     },
     {
-      title: "Customer Operations",
+      title: "Customer & Relationship",
       items: [
         {
           href: "/admin/clinic/chat",
@@ -27,12 +27,12 @@ export function getClinicNav(unreadCount = 0): AdminNavSection[] {
           label: "Chat",
           badge: unreadCount > 0 ? unreadCount : undefined,
         },
-        { href: "/admin/clinic/patients", icon: "group", label: "Patients" },
         {
           href: "/admin/clinic/appointments",
           icon: "calendar_today",
           label: "Appointments",
         },
+        { href: "/admin/clinic/crm", icon: "diversity_1", label: "CRM" },
       ],
     },
     {
@@ -43,19 +43,7 @@ export function getClinicNav(unreadCount = 0): AdminNavSection[] {
           icon: "stethoscope",
           label: "Doctor List",
         },
-        {
-          href: "/admin/clinic/services",
-          icon: "medical_services",
-          label: "Services",
-        },
         { href: "/admin/clinic/schedules", icon: "schedule", label: "Schedules" },
-      ],
-    },
-    {
-      title: "Sales & Relationship",
-      items: [
-        { href: "/admin/clinic/leads", icon: "contact_page", label: "Leads" },
-        { href: "/admin/clinic/crm", icon: "diversity_1", label: "CRM" },
       ],
     },
     {
@@ -65,11 +53,6 @@ export function getClinicNav(unreadCount = 0): AdminNavSection[] {
           href: "/admin/clinic/automation",
           icon: "smart_toy",
           label: "AI Automation",
-        },
-        {
-          href: "/admin/clinic/workflows",
-          icon: "account_tree",
-          label: "Workflows",
         },
       ],
     },

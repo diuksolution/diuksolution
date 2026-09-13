@@ -47,7 +47,7 @@ export function CoreNav({
                 prefetch
                 title={collapsed ? item.label : undefined}
                 onClick={onNavigate}
-                className={`relative flex items-center justify-between rounded-lg px-3 py-2 transition-colors ${
+                className={`relative flex items-center justify-between rounded-lg px-3 py-1 transition-colors ${
                   active
                     ? "bg-primary text-white shadow-sm"
                     : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
@@ -55,7 +55,7 @@ export function CoreNav({
               >
                 <span className="flex min-w-0 items-center gap-2.5">
                   <span className="relative">
-                    <Icon name={item.icon} className="text-[20px] leading-none" />
+                    <Icon name={item.icon} className="mt-2 text-[20px] leading-none" />
                     {collapsed && item.badge ? (
                       <span className="absolute -top-1 -right-1 size-2 rounded-full bg-error ring-2 ring-surface-container-low" />
                     ) : null}

@@ -38,6 +38,7 @@ export async function POST(request: Request) {
       to: conversation.contact.waId,
       text,
       phoneNumberId: number?.phoneNumberId,
+      businessId: user.businessId,
     });
 
     const sentAt = new Date();

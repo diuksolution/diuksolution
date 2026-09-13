@@ -308,12 +308,12 @@ function buildTimeline(input: {
       tone: "primary",
     });
 
-    if (booking.status === "COMPLETED" && booking.completedAt) {
+    if (booking.status === "DONE" && booking.completedAt) {
       events.push({
         id: `book-done-${booking.id}`,
         at: booking.completedAt.toISOString(),
         timeLabel: formatListTime(booking.completedAt),
-        title: "Appointment completed",
+        title: "Appointment done",
         detail: booking.service,
         tone: "success",
       });
@@ -400,9 +400,8 @@ export async function getCrmWorkspaceData(
       scheduledAt: booking.scheduledAt.toISOString(),
     }));
 
-    const completed = contact.bookings.filter((b) => b.status === "COMPLETED");
+    const completed = contact.bookings.filter((b) => b.status === "DONE");
     const cancelled = contact.bookings.filter((b) => b.status === "CANCELLED");
-    const noShow = contact.bookings.filter((b) => b.status === "NO_SHOW");
     const totalSpend = completed.reduce((sum, item) => sum + item.amount, 0);
     const lastCompleted = completed[0] ?? null;
     const nextBooked =
@@ -500,7 +499,7 @@ export async function getCrmWorkspaceData(
         total: contact.bookings.length,
         completed: completed.length,
         cancelled: cancelled.length,
-        noShow: noShow.length,
+        noShow: 0,
         totalSpend,
         totalSpendLabel: formatMoney(totalSpend),
         lastBookingLabel: lastCompleted
