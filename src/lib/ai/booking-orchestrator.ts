@@ -22,7 +22,12 @@ const TOOLS_HINT = `
 Tools wajib:
 - list_services untuk harga / daftar treatment (jangan mengarang harga).
 - list_doctors, check_availability, book_appointment untuk jadwal.
-- Saat booking utamakan serviceId dari list_services.`;
+- Saat booking utamakan serviceId dari list_services.
+- Setelah book berhasil & ada harga: offer_payment_options.
+- Jika pasien pilih Bayar DP / Bayar Lunas (atau bilang mau QRIS / link bayar): create_payment.
+  - kind: DP atau FULL
+  - channel: QRIS (kirim gambar QR) atau SNAP (link QRIS+VA+e-wallet)
+- Jika tool create_payment / offer_payment_options sudah sentToWhatsApp/sent=true, balas singkat saja (jangan ulang link/QR).`;
 
 function looksLikeBookingIntent(text: string) {
   const value = text.toLowerCase();
@@ -165,6 +170,9 @@ async function runLlmBooking(input: {
   systemPrompt: string;
   recentMessages: Array<{ direction: "INBOUND" | "OUTBOUND"; text: string }>;
   latestText: string;
+  waId: string;
+  phoneNumberId?: string | null;
+  conversationId: string;
 }) {
   const history: LlmChatMessage[] = [
     {
@@ -190,7 +198,9 @@ async function runLlmBooking(input: {
     history.push({ role: "user", content: input.latestText });
   }
 
-  for (let step = 0; step < 4; step += 1) {
+  let lastToolSentPayment = false;
+
+  for (let step = 0; step < 6; step += 1) {
     const completion = await createChatCompletion({
       messages: history,
       tools: BOOKING_TOOL_DEFINITIONS,
@@ -206,6 +216,9 @@ async function runLlmBooking(input: {
 
     const toolCalls = message.tool_calls ?? [];
     if (toolCalls.length === 0) {
+      if (lastToolSentPayment) {
+        return message.content?.trim() || null;
+      }
       return message.content?.trim() || null;
     }
 
@@ -214,9 +227,22 @@ async function runLlmBooking(input: {
         businessId: input.businessId,
         contactId: input.contactId,
         customerName: input.customerName,
+        waId: input.waId,
+        phoneNumberId: input.phoneNumberId,
+        conversationId: input.conversationId,
         name: call.function.name,
         argsJson: call.function.arguments,
       });
+
+      if (
+        result &&
+        typeof result === "object" &&
+        ("sentToWhatsApp" in result || "sent" in result) &&
+        ((result as { sentToWhatsApp?: boolean }).sentToWhatsApp ||
+          (result as { sent?: boolean }).sent)
+      ) {
+        lastToolSentPayment = true;
+      }
 
       history.push({
         role: "tool",
@@ -226,7 +252,9 @@ async function runLlmBooking(input: {
     }
   }
 
-  return "Sebentar ya, sistem booking masih memproses. Coba sebutkan hari yang diinginkan.";
+  return lastToolSentPayment
+    ? null
+    : "Sebentar ya, sistem booking masih memproses. Coba sebutkan hari yang diinginkan.";
 }
 
 async function persistOutboundReply(input: {
@@ -272,6 +300,7 @@ export async function handleInboundBookingAi(input: {
   customerName?: string | null;
   waId: string;
   text: string;
+  buttonId?: string | null;
   phoneNumberId?: string | null;
 }) {
   const settings = await getOrCreateAiAutomationSettings(input.businessId);
@@ -298,6 +327,16 @@ export async function handleInboundBookingAi(input: {
   const businessName = business?.name || "klinik kami";
   const displayName = input.customerName?.trim() || "Kak";
 
+  const inboundText = (() => {
+    if (input.buttonId === "pay_dp") {
+      return "Saya mau bayar DP. Kirim QRIS.";
+    }
+    if (input.buttonId === "pay_full") {
+      return "Saya mau bayar lunas. Kirim QRIS.";
+    }
+    return input.text;
+  })();
+
   const inboundCount = await prisma.message.count({
     where: {
       conversationId: input.conversationId,
@@ -306,7 +345,11 @@ export async function handleInboundBookingAi(input: {
   });
   const isFirstMessage = inboundCount <= 1;
 
-  if (settings.welcomeEnabled && isFirstMessage && !looksLikeBookingIntent(input.text)) {
+  if (
+    settings.welcomeEnabled &&
+    isFirstMessage &&
+    !looksLikeBookingIntent(inboundText)
+  ) {
     const welcome = renderPromptTemplate(settings.welcomePrompt, {
       name: displayName,
       business: businessName,
@@ -356,7 +399,10 @@ export async function handleInboundBookingAi(input: {
       businessName,
       systemPrompt: settings.bookingSystemPrompt,
       recentMessages,
-      latestText: input.text,
+      latestText: inboundText,
+      waId: input.waId,
+      phoneNumberId: input.phoneNumberId,
+      conversationId: input.conversationId,
     });
   } catch (error) {
     console.error("[ai booking] llm failed", error);
@@ -367,7 +413,7 @@ export async function handleInboundBookingAi(input: {
       businessId: input.businessId,
       contactId: input.contactId,
       customerName: input.customerName,
-      text: input.text,
+      text: inboundText,
     });
   }
 
@@ -375,7 +421,7 @@ export async function handleInboundBookingAi(input: {
     !reply &&
     settings.welcomeEnabled &&
     isFirstMessage &&
-    looksLikeBookingIntent(input.text)
+    looksLikeBookingIntent(inboundText)
   ) {
     // First message is booking intent but LLM/rule failed — still greet.
     reply = renderPromptTemplate(settings.welcomePrompt, {
@@ -392,7 +438,7 @@ export async function handleInboundBookingAi(input: {
   if (
     settings.welcomeEnabled &&
     isFirstMessage &&
-    looksLikeBookingIntent(input.text)
+    looksLikeBookingIntent(inboundText)
   ) {
     const welcome = renderPromptTemplate(settings.welcomePrompt, {
       name: displayName,

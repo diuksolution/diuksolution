@@ -7,6 +7,7 @@ export type WhatsAppInboundMessage = {
   messageId: string;
   type: string;
   text?: string;
+  buttonId?: string;
   contactName?: string;
 };
 
@@ -37,6 +38,12 @@ type WhatsAppChangeValue = {
     timestamp?: string;
     type?: string;
     text?: { body?: string };
+    button?: { payload?: string; text?: string };
+    interactive?: {
+      type?: string;
+      button_reply?: { id?: string; title?: string };
+      list_reply?: { id?: string; title?: string };
+    };
   }>;
   statuses?: Array<{
     id?: string;
@@ -54,6 +61,44 @@ type WhatsAppWebhookBody = {
     }>;
   }>;
 };
+
+function extractInboundText(message: NonNullable<WhatsAppChangeValue["messages"]>[number]) {
+  if (message.text?.body) {
+    return {
+      text: message.text.body,
+      buttonId: undefined as string | undefined,
+    };
+  }
+
+  if (message.interactive?.button_reply) {
+    return {
+      text:
+        message.interactive.button_reply.title ||
+        message.interactive.button_reply.id ||
+        "",
+      buttonId: message.interactive.button_reply.id,
+    };
+  }
+
+  if (message.interactive?.list_reply) {
+    return {
+      text:
+        message.interactive.list_reply.title ||
+        message.interactive.list_reply.id ||
+        "",
+      buttonId: message.interactive.list_reply.id,
+    };
+  }
+
+  if (message.button?.text || message.button?.payload) {
+    return {
+      text: message.button.text || message.button.payload || "",
+      buttonId: message.button.payload,
+    };
+  }
+
+  return { text: undefined, buttonId: undefined };
+}
 
 export function parseWhatsAppWebhook(body: unknown): ParsedWhatsAppWebhook {
   const payload = body as WhatsAppWebhookBody;
@@ -79,6 +124,8 @@ export function parseWhatsAppWebhook(body: unknown): ParsedWhatsAppWebhook {
           continue;
         }
 
+        const extracted = extractInboundText(message);
+
         messages.push({
           wabaId: entry.id,
           phoneNumberId: value.metadata?.phone_number_id,
@@ -87,7 +134,8 @@ export function parseWhatsAppWebhook(body: unknown): ParsedWhatsAppWebhook {
           timestamp: message.timestamp ?? "",
           messageId: message.id,
           type: message.type ?? "unknown",
-          text: message.text?.body,
+          text: extracted.text,
+          buttonId: extracted.buttonId,
           contactName: contactNames.get(message.from),
         });
       }

@@ -90,6 +90,24 @@ enum CrmBookingStatus {
   DONE
 }
 
+enum PaymentKind {
+  DP
+  FULL
+}
+
+enum PaymentStatus {
+  PENDING
+  SETTLEMENT
+  EXPIRE
+  CANCEL
+  FAILURE
+}
+
+enum PaymentChannel {
+  SNAP
+  QRIS
+}
+
 model Business {
   id              String           @id @default(cuid())
   name            String
@@ -105,6 +123,7 @@ model Business {
   practitioners   Practitioner[]
   daySchedules    PractitionerDaySchedule[]
   services        Service[]
+  payments        Payment[]
   aiAutomation    AiAutomationSettings?
 }
 
@@ -251,6 +270,7 @@ model Contact {
   notes           ContactNote[]
   followUps       ContactFollowUp[]
   bookings        CrmBooking[]
+  payments        Payment[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -330,12 +350,40 @@ model CrmBooking {
   completedAt    DateTime?
   googleEventId  String?
   notes          String?
+  payments       Payment[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
   @@index([businessId, scheduledAt])
   @@index([contactId, scheduledAt])
   @@index([practitionerId, scheduledAt])
+}
+
+model Payment {
+  id                    String         @id @default(cuid())
+  businessId            String
+  business              Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bookingId             String
+  booking               CrmBooking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  contactId             String?
+  contact               Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  /// Midtrans order_id (unique)
+  orderId               String         @unique
+  kind                  PaymentKind
+  channel               PaymentChannel
+  amount                Int
+  status                PaymentStatus  @default(PENDING)
+  snapToken             String?
+  redirectUrl           String?
+  qrisUrl               String?
+  midtransTransactionId String?
+  paidAt                DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([businessId, status])
+  @@index([bookingId, status])
+  @@index([contactId])
 }
 
 model Conversation {

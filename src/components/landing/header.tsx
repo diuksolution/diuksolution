@@ -54,7 +54,7 @@ export function Header() {
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-4 sm:pt-4">
       <div className="pointer-events-auto mx-auto max-w-5xl">
-        <div className="rounded-full border border-white/60 bg-white/55 shadow-[0_8px_32px_-12px_rgba(30,36,48,0.28)] backdrop-blur-xl supports-backdrop-filter:bg-white/45">
+        <div className="rounded-2xl md:rounded-full border border-white/60 bg-white/55 shadow-[0_8px_32px_-12px_rgba(30,36,48,0.28)] backdrop-blur-xl supports-backdrop-filter:bg-white/45">
           <div className="flex h-14 items-center justify-between gap-3 px-3 sm:px-4">
             <a href={header.logo.href} className="flex shrink-0 items-center gap-2">
               <Image

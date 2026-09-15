@@ -171,7 +171,7 @@ export async function ingestWhatsAppWebhook(parsed: ParsedWhatsAppWebhook) {
       };
     });
 
-    if (inbound.type === "text" && inbound.text?.trim()) {
+    if (inbound.text?.trim()) {
       void handleInboundBookingAi({
         businessId: number.businessId,
         conversationId: saved.conversationId,
@@ -179,6 +179,7 @@ export async function ingestWhatsAppWebhook(parsed: ParsedWhatsAppWebhook) {
         customerName: saved.contactName,
         waId: inbound.from,
         text: inbound.text.trim(),
+        buttonId: inbound.buttonId,
         phoneNumberId: number.phoneNumberId,
       }).catch((error) => {
         console.error("[whatsapp ingest] ai booking failed", error);
