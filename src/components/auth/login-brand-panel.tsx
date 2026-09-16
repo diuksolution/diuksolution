@@ -51,7 +51,7 @@ export function LoginBrandPanel() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <span className="truncate text-[12px] font-semibold text-on-surface">
-                    Amanda Putri
+                    Sukarni Putri
                   </span>
                   <span className="text-[10px] text-outline">10:28 AM</span>
                 </div>
