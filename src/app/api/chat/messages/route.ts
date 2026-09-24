@@ -24,6 +24,7 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const businessId = user.businessId;
   const body = (await request.json()) as {
     conversationId?: string;
     text?: string;
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
         aiEnabled: false,
       },
     });
-    await invalidateChatCache(user.businessId, openConversation.id);
+    await invalidateChatCache(businessId, openConversation.id);
 
     return message;
   }
