@@ -82,6 +82,7 @@ export type ChatConversation = {
   unread: number;
   assignedToMe: boolean;
   aiActive: boolean;
+  canReply?: boolean;
   needsAction: boolean;
   vip: boolean;
   since: string;
@@ -108,5 +109,6 @@ export type ChatWorkspaceData = {
   copy: ChatCopy;
   activeCount: number;
   live?: boolean;
+  revision?: number;
   conversations: ChatConversation[];
 };

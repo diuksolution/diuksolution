@@ -1,12 +1,14 @@
 import type { PaymentChannel, PaymentKind } from "@prisma/client";
 import {
   findAvailableSlots,
-  listConnectedDoctors,
+  listActiveDoctors,
+  parseRequestedDay,
 } from "@/lib/booking/availability";
 import { createDoctorBooking } from "@/lib/booking/create";
 import { createBookingPayment } from "@/lib/payments/create";
 import { listActiveServices } from "@/lib/services";
 import { formatIdr } from "@/lib/services/format";
+import { invalidateChatCache } from "@/lib/chat/cache";
 import { prisma } from "@/lib/prisma";
 import {
   sendWhatsAppImage,
@@ -20,7 +22,7 @@ export const BOOKING_TOOL_DEFINITIONS = [
     function: {
       name: "list_services",
       description:
-        "List active clinic services from the catalog with full price (IDR), optional DP amount, and duration. Use this for harga / treatment info and before booking.",
+        "List active clinic services with price, DP, duration, and which doctors may perform each service. Use before quoting harga or checking slots.",
       parameters: {
         type: "object",
         properties: {},
@@ -33,7 +35,7 @@ export const BOOKING_TOOL_DEFINITIONS = [
     function: {
       name: "list_doctors",
       description:
-        "List active doctors whose Google Calendar is connected and can accept bookings.",
+        "List bookable doctors (calendar connected) and the services each doctor is allowed to perform.",
       parameters: {
         type: "object",
         properties: {},
@@ -46,22 +48,27 @@ export const BOOKING_TOOL_DEFINITIONS = [
     function: {
       name: "check_availability",
       description:
-        "Check open appointment slots across connected doctor calendars (or one doctor).",
+        "Check open slots using the doctor's Schedule hours (off days / custom hours) and only doctors assigned to the service. Always pass serviceId when the treatment is known.",
       parameters: {
         type: "object",
         properties: {
           doctorId: {
             type: "string",
-            description: "Optional doctor id to filter.",
+            description: "Optional doctor id. Must offer the selected service.",
           },
           serviceId: {
             type: "string",
             description:
-              "Optional service id from list_services — uses its durationMin when set.",
+              "Service id from list_services. Required to filter doctors and use the correct duration.",
           },
           daysAhead: {
             type: "number",
             description: "How many days ahead to search. Default 7.",
+          },
+          dateHint: {
+            type: "string",
+            description:
+              "Patient wording for the day, e.g. 'besok', 'hari ini', 'lusa'. Slots come from clinic Schedule, not Google Calendar.",
           },
           durationMinutes: {
             type: "number",
@@ -78,7 +85,7 @@ export const BOOKING_TOOL_DEFINITIONS = [
     function: {
       name: "book_appointment",
       description:
-        "Book an appointment into a doctor's Google Calendar and save it in CRM. Prefer serviceId from list_services so price/DP are stored correctly. After success, offer payment via offer_payment_options.",
+        "Book an appointment. doctorId must be assigned to serviceId. startIso must come from check_availability. After success, offer payment via offer_payment_options.",
       parameters: {
         type: "object",
         properties: {
@@ -99,7 +106,7 @@ export const BOOKING_TOOL_DEFINITIONS = [
           durationMinutes: { type: "number" },
           notes: { type: "string" },
         },
-        required: ["doctorId", "startIso"],
+        required: ["doctorId", "startIso", "serviceId"],
         additionalProperties: false,
       },
     },
@@ -197,6 +204,7 @@ async function resolveServiceForBooking(
 
 async function persistOutbound(input: {
   conversationId?: string | null;
+  businessId?: string | null;
   waMessageId: string;
   text: string;
 }) {
@@ -222,6 +230,9 @@ async function persistOutbound(input: {
       lastPreview: input.text.slice(0, 180),
     },
   });
+  if (input.businessId) {
+    await invalidateChatCache(input.businessId, input.conversationId);
+  }
 }
 
 export async function executeBookingTool(input: {
@@ -255,13 +266,25 @@ export async function executeBookingTool(input: {
           service.dpAmount > 0 ? formatIdr(service.dpAmount) : null,
         hasDp: service.dpAmount > 0,
         durationMin: service.durationMin,
+        doctors: service.practitioners,
       })),
       count: services.length,
     };
   }
 
   if (input.name === "list_doctors") {
-    const doctors = await listConnectedDoctors(input.businessId);
+    const [doctors, catalog] = await Promise.all([
+      listActiveDoctors(input.businessId),
+      listActiveServices(input.businessId),
+    ]);
+    const servicesByDoctor = new Map<string, Array<{ id: string; name: string }>>();
+    for (const service of catalog) {
+      for (const doctor of service.practitioners) {
+        const list = servicesByDoctor.get(doctor.id) ?? [];
+        list.push({ id: service.id, name: service.name });
+        servicesByDoctor.set(doctor.id, list);
+      }
+    }
     return {
       doctors: doctors.map((doctor) => ({
         id: doctor.id,
@@ -269,6 +292,7 @@ export async function executeBookingTool(input: {
         title: doctor.title,
         specialty: doctor.specialty,
         location: doctor.location,
+        services: servicesByDoctor.get(doctor.id) ?? [],
       })),
       count: doctors.length,
     };
@@ -284,15 +308,34 @@ export async function executeBookingTool(input: {
         ? args.durationMinutes
         : (catalogService?.durationMin ?? undefined);
 
+    const requested = parseRequestedDay(
+      typeof args.dateHint === "string" ? args.dateHint : "",
+    );
     const slots = await findAvailableSlots({
       businessId: input.businessId,
       doctorId:
         typeof args.doctorId === "string" ? args.doctorId : undefined,
+      serviceId: catalogService?.id,
+      serviceName: catalogService?.name,
       daysAhead:
-        typeof args.daysAhead === "number" ? args.daysAhead : undefined,
+        typeof args.daysAhead === "number"
+          ? args.daysAhead
+          : requested?.daysAhead,
+      fromDate: requested?.fromDate,
       durationMinutes,
     });
-    return { slots, count: slots.length };
+    return {
+      slots,
+      count: slots.length,
+      source: "clinic-schedule",
+      serviceId: catalogService?.id ?? null,
+      serviceName: catalogService?.name ?? null,
+      durationMin: durationMinutes ?? catalogService?.durationMin ?? 60,
+      hint:
+        slots.length === 0
+          ? "Tidak ada slot di jam kerja Schedule / appointment sudah terisi. Jangan mengarang 'penuh' dari Google Calendar."
+          : "Ini slot klinik yang benar. Tawarkan ke pasien, jangan bilang penuh kalau count > 0.",
+    };
   }
 
   if (input.name === "book_appointment") {
@@ -317,18 +360,25 @@ export async function executeBookingTool(input: {
         ? args.durationMinutes
         : (catalogService?.durationMin ?? 60);
 
-    const booking = await createDoctorBooking({
-      businessId: input.businessId,
-      contactId: input.contactId,
-      doctorId,
-      startIso,
-      service: serviceName,
-      serviceId: catalogService?.id,
-      amount: catalogService?.price,
-      durationMinutes,
-      notes: typeof args.notes === "string" ? args.notes : undefined,
-      customerName: input.customerName ?? undefined,
-    });
+    let booking;
+    try {
+      booking = await createDoctorBooking({
+        businessId: input.businessId,
+        contactId: input.contactId,
+        doctorId,
+        startIso,
+        service: serviceName,
+        serviceId: catalogService?.id,
+        amount: catalogService?.price,
+        durationMinutes,
+        notes: typeof args.notes === "string" ? args.notes : undefined,
+        customerName: input.customerName ?? undefined,
+      });
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Booking failed",
+      };
+    }
 
     return {
       ok: true,
@@ -373,13 +423,21 @@ export async function executeBookingTool(input: {
       return { error: "Booking has no price; cannot offer payment." };
     }
 
-    const service = await prisma.service.findFirst({
-      where: {
-        businessId: input.businessId,
-        name: booking.service,
-        isActive: true,
-      },
-    });
+    const service = booking.serviceId
+      ? await prisma.service.findFirst({
+          where: {
+            id: booking.serviceId,
+            businessId: input.businessId,
+            isActive: true,
+          },
+        })
+      : await prisma.service.findFirst({
+          where: {
+            businessId: input.businessId,
+            name: booking.service,
+            isActive: true,
+          },
+        });
 
     const buttons: Array<{ id: string; title: string }> = [];
     if (service && service.dpAmount > 0) {
@@ -409,6 +467,7 @@ export async function executeBookingTool(input: {
 
     await persistOutbound({
       conversationId: input.conversationId,
+      businessId: input.businessId,
       waMessageId,
       text: bodyText,
     });
@@ -458,6 +517,7 @@ export async function executeBookingTool(input: {
         });
         await persistOutbound({
           conversationId: input.conversationId,
+          businessId: input.businessId,
           waMessageId,
           text: result.customerMessage,
         });
@@ -470,6 +530,7 @@ export async function executeBookingTool(input: {
         });
         await persistOutbound({
           conversationId: input.conversationId,
+          businessId: input.businessId,
           waMessageId,
           text: result.customerMessage,
         });

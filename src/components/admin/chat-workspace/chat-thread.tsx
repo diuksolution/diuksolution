@@ -234,6 +234,11 @@ export function ChatThread({
                     <div className="mt-1 flex items-center justify-end gap-1">
                       <DeliveryTicks status={message.deliveryStatus} />
                     </div>
+                    {message.deliveryStatus === "FAILED" ? (
+                      <p className="mt-1 text-right text-[11px] text-warning">
+                        Gagal terkirim
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -341,6 +346,12 @@ export function ChatThread({
       </div>
 
       <div className="shrink-0 border-t border-outline-variant bg-white p-5">
+        {live && conversation.canReply === false ? (
+          <div className="mb-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-5 text-on-surface">
+            Balasan teks bebas hanya bisa 24 jam setelah customer chat.
+            Reminder dan broadcast tetap bisa lewat template WhatsApp.
+          </div>
+        ) : null}
         <div className="rounded-2xl border border-outline-variant bg-white p-3 shadow-sm focus-within:border-primary">
           <textarea
             rows={2}

@@ -7,9 +7,15 @@ import type {
 } from "@/lib/chat/types";
 import { prisma } from "@/lib/prisma";
 import { getChatCopy } from "@/lib/chat/workspace-data";
+import {
+  getChatRevision,
+  rememberInbox,
+  rememberMessages,
+} from "@/lib/chat/cache";
+import { isWithinCustomerServiceWindow } from "@/lib/whatsapp/session-window";
 
 type ConversationWithContact = Conversation & {
-  contact: Contact;
+  contact: Pick<Contact, "id" | "name" | "waId">;
 };
 
 function initialsFrom(name: string) {
@@ -104,6 +110,7 @@ export function toChatMessages(input: {
 export function toChatConversation(
   conversation: ConversationWithContact,
   messages: ChatMessage[] = [],
+  extras?: { canReply?: boolean },
 ): ChatConversation {
   const name =
     conversation.contact.name?.trim() || formatPhone(conversation.contact.waId);
@@ -119,6 +126,7 @@ export function toChatConversation(
     unread: conversation.unreadCount,
     assignedToMe: false,
     aiActive: conversation.aiEnabled,
+    canReply: extras?.canReply ?? true,
     needsAction: conversation.unreadCount > 0,
     vip: false,
     since: `Customer since ${new Intl.DateTimeFormat("en-GB", {
@@ -143,39 +151,60 @@ export async function getLiveChatInbox(
   variant: "clinic" | "salon" | "fnb",
   copy?: ChatCopy,
 ): Promise<ChatWorkspaceData> {
-  const rows = await prisma.conversation.findMany({
-    where: { businessId },
-    include: { contact: true },
-    orderBy: { lastMessageAt: "desc" },
-  });
+  const [payload, revision] = await Promise.all([
+    rememberInbox(businessId, variant, async () => {
+      const rows = await prisma.conversation.findMany({
+        where: { businessId },
+        include: {
+          contact: {
+            select: { id: true, name: true, waId: true, createdAt: true },
+          },
+        },
+        orderBy: { lastMessageAt: "desc" },
+        take: 50,
+      });
 
-  const conversations = rows.map((row) => toChatConversation(row, []));
+      const conversations = rows.map((row) =>
+        toChatConversation(row, [], {
+          canReply: isWithinCustomerServiceWindow(row.lastMessageAt),
+        }),
+      );
 
-  return {
-    copy: copy ?? getChatCopy(variant),
-    activeCount: conversations.length,
-    live: true,
-    conversations,
-  };
+      return {
+        copy: copy ?? getChatCopy(variant),
+        activeCount: conversations.length,
+        live: true as const,
+        conversations,
+      };
+    }),
+    getChatRevision(businessId),
+  ]);
+
+  return { ...payload, revision };
 }
 
 export async function getConversationMessages(
   businessId: string,
   conversationId: string,
 ): Promise<ChatMessage[] | null> {
-  const conversation = await prisma.conversation.findFirst({
-    where: { id: conversationId, businessId },
-    include: {
-      contact: true,
-      messages: { orderBy: { sentAt: "asc" } },
-    },
+  return rememberMessages(businessId, conversationId, async () => {
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, businessId },
+      include: {
+        contact: true,
+        messages: { orderBy: { sentAt: "desc" }, take: 80 },
+      },
+    });
+
+    if (!conversation) {
+      return null;
+    }
+
+    return toChatMessages({
+      contact: conversation.contact,
+      messages: conversation.messages.slice().reverse(),
+    });
   });
-
-  if (!conversation) {
-    return null;
-  }
-
-  return toChatMessages(conversation);
 }
 
 /** Initial page payload: inbox + messages for one open room. */

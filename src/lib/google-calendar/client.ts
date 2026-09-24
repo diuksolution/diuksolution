@@ -89,6 +89,7 @@ export async function queryFreeBusy(input: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(2500),
       body: JSON.stringify({
         timeMin: input.timeMin.toISOString(),
         timeMax: input.timeMax.toISOString(),

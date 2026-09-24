@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import {
+  linkNewPractitionerToAllServices,
+  setPractitionerServices,
+} from "@/lib/booking/catalog";
 import type {
   PractitionerInput,
   PractitionerRow,
@@ -39,10 +43,12 @@ function mapPractitioner(row: {
   googleCalendarId: string | null;
   googleConnectedAt: Date | null;
   calendarSyncEnabled: boolean;
+  services?: Array<{ service: { id: string; name: string } }>;
 }): PractitionerRow {
   const specialtyBits = [row.title, row.specialty, row.location]
     .filter(Boolean)
     .join(" · ");
+  const services = (row.services ?? []).map((item) => item.service);
 
   return {
     id: row.id,
@@ -66,12 +72,22 @@ function mapPractitioner(row: {
         ? "connected"
         : "disconnected",
     displaySpecialty: specialtyBits || "General",
+    services,
+    serviceIds: services.map((item) => item.id),
   };
 }
+
+const practitionerInclude = {
+  services: {
+    include: { service: { select: { id: true, name: true } } },
+    orderBy: { service: { sortOrder: "asc" as const } },
+  },
+};
 
 export async function listPractitioners(businessId: string) {
   const rows = await prisma.practitioner.findMany({
     where: { businessId },
+    include: practitionerInclude,
     orderBy: [{ isActive: "desc" }, { name: "asc" }],
   });
 
@@ -101,9 +117,20 @@ export async function createPractitioner(
       timezone: input.timezone?.trim() || "Asia/Jakarta",
       tone: input.tone ?? "primary",
     },
+    include: practitionerInclude,
   });
 
-  return mapPractitioner(row);
+  if (input.serviceIds) {
+    await setPractitionerServices(businessId, row.id, input.serviceIds);
+  } else {
+    await linkNewPractitionerToAllServices(businessId, row.id);
+  }
+
+  const hydrated = await prisma.practitioner.findUnique({
+    where: { id: row.id },
+    include: practitionerInclude,
+  });
+  return mapPractitioner(hydrated ?? row);
 }
 
 export async function updatePractitioner(
@@ -117,6 +144,10 @@ export async function updatePractitioner(
   });
   if (!existing) {
     return null;
+  }
+
+  if (input.serviceIds !== undefined) {
+    await setPractitionerServices(businessId, id, input.serviceIds);
   }
 
   const row = await prisma.practitioner.update({
@@ -145,6 +176,7 @@ export async function updatePractitioner(
         : {}),
       ...(input.tone !== undefined ? { tone: input.tone } : {}),
     },
+    include: practitionerInclude,
   });
 
   return mapPractitioner(row);

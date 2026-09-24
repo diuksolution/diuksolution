@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { doctorOffersService } from "@/lib/booking/catalog";
 import { createCalendarEvent } from "@/lib/google-calendar/client";
 
 export async function createDoctorBooking(input: {
@@ -18,13 +19,24 @@ export async function createDoctorBooking(input: {
       id: input.doctorId,
       businessId: input.businessId,
       isActive: true,
-      calendarSyncEnabled: true,
-      googleRefreshToken: { not: null },
     },
   });
 
   if (!doctor) {
-    throw new Error("Doctor not found or calendar not connected.");
+    throw new Error("Doctor not found or inactive.");
+  }
+
+  if (input.serviceId) {
+    const allowed = await doctorOffersService(
+      input.businessId,
+      input.doctorId,
+      input.serviceId,
+    );
+    if (!allowed) {
+      throw new Error(
+        "Dokter ini tidak menangani layanan tersebut. Pilih dokter yang terdaftar untuk treatment ini.",
+      );
+    }
   }
 
   const contact = await prisma.contact.findFirst({
@@ -52,34 +64,45 @@ export async function createDoctorBooking(input: {
       ? Math.max(0, Math.trunc(input.amount))
       : 0;
 
-  const event = await createCalendarEvent({
-    practitioner: doctor,
-    summary: `${input.service} · ${customerName}`,
-    description: [
-      `Booked via DIUK WhatsApp AI`,
-      `Customer: ${customerName}`,
-      `Phone: +${contact.waId.replace(/^\+/, "")}`,
-      amount > 0 ? `Price: Rp ${amount.toLocaleString("id-ID")}` : null,
-      input.notes ? `Notes: ${input.notes}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    start,
-    end,
-    timeZone: doctor.timezone || "Asia/Jakarta",
-  });
+  let event: { eventId: string | null; htmlLink: string | null } = {
+    eventId: null,
+    htmlLink: null,
+  };
+  if (doctor.calendarSyncEnabled && doctor.googleRefreshToken) {
+    try {
+      event = await createCalendarEvent({
+        practitioner: doctor,
+        summary: `${input.service} · ${customerName}`,
+        description: [
+          `Booked via DIUK WhatsApp AI`,
+          `Customer: ${customerName}`,
+          `Phone: +${contact.waId.replace(/^\+/, "")}`,
+          amount > 0 ? `Price: Rp ${amount.toLocaleString("id-ID")}` : null,
+          input.notes ? `Notes: ${input.notes}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        start,
+        end,
+        timeZone: doctor.timezone || "Asia/Jakarta",
+      });
+    } catch (error) {
+      console.warn("[booking] calendar sync skipped", error);
+    }
+  }
 
   const booking = await prisma.crmBooking.create({
     data: {
       businessId: input.businessId,
       contactId: contact.id,
       practitionerId: doctor.id,
+      serviceId: input.serviceId ?? null,
       service: input.service,
       staffName: doctor.name,
       status: "BOOKED",
       amount,
       scheduledAt: start,
-      googleEventId: event.eventId,
+      googleEventId: event.eventId ?? undefined,
       notes: input.notes ?? null,
     },
   });

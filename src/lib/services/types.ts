@@ -7,6 +7,8 @@ export type ServiceRow = {
   durationMin: number | null;
   isActive: boolean;
   sortOrder: number;
+  practitioners: Array<{ id: string; name: string }>;
+  practitionerIds: string[];
 };
 
 export type ServiceInput = {
@@ -17,4 +19,5 @@ export type ServiceInput = {
   durationMin?: number | null;
   isActive?: boolean;
   sortOrder?: number;
+  practitionerIds?: string[];
 };

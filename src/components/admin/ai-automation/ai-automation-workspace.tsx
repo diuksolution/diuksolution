@@ -120,7 +120,7 @@ export function AiAutomationWorkspace({
               <p className="mt-1 text-xs text-on-surface-variant">
                 {llm.configured
                   ? `Model · ${llm.model}`
-                  : "Tambah MOONSHOT_API_KEY di .env"}
+                  : "Tambah OPENAI_API_KEY di .env"}
               </p>
             </div>
             <span

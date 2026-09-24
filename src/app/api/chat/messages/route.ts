@@ -1,7 +1,23 @@
 import { NextResponse } from "next/server";
+import { invalidateChatCache } from "@/lib/chat/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
 import { sendWhatsAppText } from "@/lib/whatsapp/send";
+import {
+  describeWhatsAppSendError,
+  isWithinCustomerServiceWindow,
+  normalizeWaId,
+  OUTSIDE_SESSION_WINDOW_MESSAGE,
+} from "@/lib/whatsapp/session-window";
+
+function formatJakartaTime(date: Date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Jakarta",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -29,53 +45,87 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
   }
 
-  const number = await prisma.whatsAppNumber.findFirst({
-    where: { businessId: user.businessId },
-  });
+  const openConversation = conversation;
 
-  try {
-    const waMessageId = await sendWhatsAppText({
-      to: conversation.contact.waId,
-      text,
-      phoneNumberId: number?.phoneNumberId,
-      businessId: user.businessId,
-    });
+  const [number, lastInbound] = await Promise.all([
+    prisma.whatsAppNumber.findFirst({
+      where: { businessId: user.businessId },
+    }),
+    prisma.message.findFirst({
+      where: { conversationId: openConversation.id, direction: "INBOUND" },
+      orderBy: { sentAt: "desc" },
+      select: { sentAt: true },
+    }),
+  ]);
 
-    const sentAt = new Date();
+  const sentAt = new Date();
+
+  async function persist(status: "SENT" | "FAILED", waMessageId?: string) {
     const message = await prisma.message.create({
       data: {
-        conversationId: conversation.id,
+        conversationId: openConversation.id,
         waMessageId,
         direction: "OUTBOUND",
         type: "text",
         text,
-        status: "SENT",
+        status,
         sentAt,
       },
     });
 
     await prisma.conversation.update({
-      where: { id: conversation.id },
+      where: { id: openConversation.id },
       data: {
         lastMessageAt: sentAt,
         lastPreview: text.slice(0, 180),
+        aiEnabled: false,
       },
     });
+    await invalidateChatCache(user.businessId, openConversation.id);
 
-    return NextResponse.json({
+    return message;
+  }
+
+  function payloadOf(
+    message: { id: string },
+    deliveryStatus: "SENT" | "FAILED",
+    error?: string,
+  ) {
+    return {
       id: message.id,
-      kind: "business",
-      time: new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Asia/Jakarta",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }).format(sentAt),
+      kind: "business" as const,
+      time: formatJakartaTime(sentAt),
       text,
-      deliveryStatus: "SENT",
+      deliveryStatus,
+      aiEnabled: false,
+      ...(error ? { error } : {}),
+    };
+  }
+
+  // Inbox composer is session text only. Reminder/broadcast use sendWhatsAppTemplate.
+  if (!isWithinCustomerServiceWindow(lastInbound?.sentAt)) {
+    const message = await persist("FAILED");
+    return NextResponse.json(
+      payloadOf(message, "FAILED", OUTSIDE_SESSION_WINDOW_MESSAGE),
+      { status: 409 },
+    );
+  }
+
+  try {
+    const waMessageId = await sendWhatsAppText({
+      to: normalizeWaId(openConversation.contact.waId),
+      text,
+      phoneNumberId: number?.phoneNumberId,
+      businessId: user.businessId,
     });
+
+    const message = await persist("SENT", waMessageId);
+    return NextResponse.json(payloadOf(message, "SENT"));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to send.";
-    return NextResponse.json({ error: message }, { status: 502 });
+    const message = await persist("FAILED");
+    return NextResponse.json(
+      payloadOf(message, "FAILED", describeWhatsAppSendError(error)),
+      { status: 502 },
+    );
   }
 }

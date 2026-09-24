@@ -6,6 +6,8 @@ import { Icon } from "@/components/ui/icon";
 import { formatIdr } from "@/lib/services/format";
 import type { ServiceRow } from "@/lib/services/types";
 
+type CatalogDoctor = { id: string; name: string };
+
 type FormState = {
   name: string;
   description: string;
@@ -13,6 +15,7 @@ type FormState = {
   dpAmount: string;
   durationMin: string;
   isActive: boolean;
+  practitionerIds: string[];
 };
 
 const emptyForm: FormState = {
@@ -22,6 +25,7 @@ const emptyForm: FormState = {
   dpAmount: "0",
   durationMin: "",
   isActive: true,
+  practitionerIds: [],
 };
 
 function digitsOnly(value: string) {
@@ -39,6 +43,7 @@ function toForm(service: ServiceRow): FormState {
         ? ""
         : String(service.durationMin),
     isActive: service.isActive,
+    practitionerIds: service.practitionerIds ?? [],
   };
 }
 
@@ -80,8 +85,10 @@ function MoneyPreview({ value }: { value: string }) {
 
 export function ServicesWorkspace({
   services,
+  catalogDoctors = [],
 }: {
   services: ServiceRow[];
+  catalogDoctors?: CatalogDoctor[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -126,7 +133,10 @@ export function ServicesWorkspace({
 
   function openCreate() {
     setMode("create");
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      practitionerIds: catalogDoctors.map((item) => item.id),
+    });
     setError(null);
     setMessage(null);
   }
@@ -171,6 +181,7 @@ export function ServicesWorkspace({
         ? Number(form.durationMin)
         : null,
       isActive: form.isActive,
+      practitionerIds: form.practitionerIds,
     };
 
     const response =
@@ -553,6 +564,55 @@ export function ServicesWorkspace({
                   </Field>
 
                   <div className="sm:col-span-2">
+                    <p className="mb-1.5 text-[11px] font-medium tracking-wide text-on-surface-variant uppercase">
+                      Dokter yang bisa handle
+                    </p>
+                    {catalogDoctors.length === 0 ? (
+                      <p className="text-sm text-on-surface-variant">
+                        Belum ada dokter. Tambah di Doctor List dulu.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {catalogDoctors.map((doctor) => {
+                          const checked = form.practitionerIds.includes(
+                            doctor.id,
+                          );
+                          return (
+                            <label
+                              key={doctor.id}
+                              className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
+                                checked
+                                  ? "border-primary/30 bg-primary/10 text-primary-dark"
+                                  : "border-outline-variant bg-white text-on-surface-variant"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={checked}
+                                onChange={() =>
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    practitionerIds: checked
+                                      ? prev.practitionerIds.filter(
+                                          (id) => id !== doctor.id,
+                                        )
+                                      : [...prev.practitionerIds, doctor.id],
+                                  }))
+                                }
+                              />
+                              {doctor.name}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <p className="mt-1.5 text-[11px] text-on-surface-variant">
+                      AI hanya tawarkan slot dari dokter yang dicentang.
+                    </p>
+                  </div>
+
+                  <div className="sm:col-span-2">
                     <Field label="Deskripsi">
                       <textarea
                         value={form.description}
@@ -731,6 +791,28 @@ export function ServicesWorkspace({
                     </p>
                   </div>
                 </div>
+
+                <section className="rounded-2xl border border-outline-variant bg-surface-container-low/50 p-4">
+                  <h3 className="text-sm font-semibold text-on-surface">
+                    Dokter
+                  </h3>
+                  {selected.practitioners.length === 0 ? (
+                    <p className="mt-2 text-sm text-on-surface-variant">
+                      Belum di-assign. AI tidak akan tawarkan layanan ini.
+                    </p>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {selected.practitioners.map((doctor) => (
+                        <span
+                          key={doctor.id}
+                          className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-on-surface shadow-xs"
+                        >
+                          {doctor.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </section>
 
                 <section className="rounded-2xl border border-outline-variant bg-surface-container-low/50 p-4">
                   <h3 className="text-sm font-semibold text-on-surface">

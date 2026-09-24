@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { invalidateChatCache } from "@/lib/chat/cache";
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 
@@ -33,6 +34,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (result.count === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  await invalidateChatCache(user.businessId, conversationId);
 
   return NextResponse.json({
     id: conversationId,

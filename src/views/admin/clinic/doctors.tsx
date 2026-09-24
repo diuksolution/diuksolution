@@ -5,6 +5,7 @@ import {
   ensureClinicDemoDoctors,
   listPractitioners,
 } from "@/lib/practitioners";
+import { listServices } from "@/lib/services";
 
 export async function ClinicDoctorsView() {
   const user = await requireUser();
@@ -13,11 +14,20 @@ export async function ClinicDoctorsView() {
     await ensureClinicDemoDoctors(user.businessId);
   }
 
-  const doctors = await listPractitioners(user.businessId);
+  const [doctors, services] = await Promise.all([
+    listPractitioners(user.businessId),
+    listServices(user.businessId),
+  ]);
 
   return (
     <Suspense fallback={<div className="p-6 text-sm text-on-surface-variant">Loading doctors…</div>}>
-      <DoctorListWorkspace doctors={doctors} />
+      <DoctorListWorkspace
+        doctors={doctors}
+        catalogServices={services.map((item) => ({
+          id: item.id,
+          name: item.name,
+        }))}
+      />
     </Suspense>
   );
 }

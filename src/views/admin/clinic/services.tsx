@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { ServicesWorkspace } from "@/components/admin/services/services-workspace";
 import { requireUser } from "@/lib/current-user";
+import { listPractitioners } from "@/lib/practitioners";
 import { ensureClinicDemoServices, listServices } from "@/lib/services";
 
 export async function ClinicServicesView() {
@@ -10,7 +11,10 @@ export async function ClinicServicesView() {
     await ensureClinicDemoServices(user.businessId);
   }
 
-  const services = await listServices(user.businessId);
+  const [services, doctors] = await Promise.all([
+    listServices(user.businessId),
+    listPractitioners(user.businessId),
+  ]);
 
   return (
     <Suspense
@@ -20,7 +24,13 @@ export async function ClinicServicesView() {
         </div>
       }
     >
-      <ServicesWorkspace services={services} />
+      <ServicesWorkspace
+        services={services}
+        catalogDoctors={doctors.map((item) => ({
+          id: item.id,
+          name: item.name,
+        }))}
+      />
     </Suspense>
   );
 }

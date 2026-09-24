@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { remember } from "@/lib/cache/store";
 import { prisma } from "@/lib/prisma";
 
 export const getCurrentUser = cache(async () => {
@@ -11,10 +12,12 @@ export const getCurrentUser = cache(async () => {
     return null;
   }
 
-  return prisma.user.findUnique({
-    where: { id: userId },
-    include: { business: true },
-  });
+  return remember(`user:${userId}`, 30_000, () =>
+    prisma.user.findUnique({
+      where: { id: userId },
+      include: { business: true },
+    }),
+  );
 });
 
 export async function requireUser() {

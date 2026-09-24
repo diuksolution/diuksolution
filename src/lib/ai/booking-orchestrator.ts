@@ -1,33 +1,18 @@
 import { prisma } from "@/lib/prisma";
-import {
-  BOOKING_TOOL_DEFINITIONS,
-  executeBookingTool,
-} from "@/lib/ai/booking-tools";
-import { createChatCompletion, type LlmChatMessage } from "@/lib/ai/llm";
+import { executeBookingTool } from "@/lib/ai/booking-tools";
+import { invalidateChatCache } from "@/lib/chat/cache";
 import {
   getOrCreateAiAutomationSettings,
   renderPromptTemplate,
 } from "@/lib/ai/settings";
 import {
   findAvailableSlots,
-  listConnectedDoctors,
+  parseRequestedDay,
 } from "@/lib/booking/availability";
 import { createDoctorBooking } from "@/lib/booking/create";
 import { listActiveServices } from "@/lib/services";
 import { formatIdr } from "@/lib/services/format";
-import { sendWhatsAppText } from "@/lib/whatsapp/send";
-
-const TOOLS_HINT = `
-
-Tools wajib:
-- list_services untuk harga / daftar treatment (jangan mengarang harga).
-- list_doctors, check_availability, book_appointment untuk jadwal.
-- Saat booking utamakan serviceId dari list_services.
-- Setelah book berhasil & ada harga: offer_payment_options.
-- Jika pasien pilih Bayar DP / Bayar Lunas (atau bilang mau QRIS / link bayar): create_payment.
-  - kind: DP atau FULL
-  - channel: QRIS (kirim gambar QR) atau SNAP (link QRIS+VA+e-wallet)
-- Jika tool create_payment / offer_payment_options sudah sentToWhatsApp/sent=true, balas singkat saja (jangan ulang link/QR).`;
+import { sendWhatsAppText, sendWhatsAppTyping } from "@/lib/whatsapp/send";
 
 function looksLikeBookingIntent(text: string) {
   const value = text.toLowerCase();
@@ -36,10 +21,33 @@ function looksLikeBookingIntent(text: string) {
   );
 }
 
+function looksLikeScheduleQuestion(text: string) {
+  const value = text.toLowerCase();
+  return /(kapan|jam berapa|hari apa|slot|kosong|dokter|siapa|jadwal|bisanya|bisa kapan|yang benar|yg benar|beneran|serius|penuh|full booked|on duty)/i.test(
+    value,
+  );
+}
+
+function looksLikePaymentIntent(text: string) {
+  return /(bayar|dp\b|lunas|qris|transfer|va\b)/i.test(text);
+}
+
 function looksLikeServiceIntent(text: string) {
   const value = text.toLowerCase();
   return /(harga|pricelist|price|biaya|tarif|layanan|treatment|paket|dp\b|down ?payment|pico|facial|laser)/i.test(
     value,
+  );
+}
+
+function looksLikeGreeting(text: string) {
+  return /^(halo|hai|hi|hello|hey|pagi|siang|sore|malam|assalamualaikum|assalam|tes|test|ping)\b/i.test(
+    text.trim(),
+  );
+}
+
+function looksLikeAck(text: string) {
+  return /^(ok|oke|okay|sip|siap|thanks|makasih|terima kasih|noted|ya|iya|nggih|baik)[\s!.]*$/i.test(
+    text.trim(),
   );
 }
 
@@ -88,12 +96,80 @@ function matchServiceFromText(
   );
 }
 
+async function runRuleBasedPayment(input: {
+  businessId: string;
+  contactId: string;
+  customerName?: string | null;
+  text: string;
+  waId: string;
+  phoneNumberId?: string | null;
+  conversationId: string;
+}) {
+  const booking = await prisma.crmBooking.findFirst({
+    where: {
+      businessId: input.businessId,
+      contactId: input.contactId,
+      status: { not: "CANCELLED" },
+    },
+    orderBy: { scheduledAt: "desc" },
+    select: { id: true },
+  });
+  if (!booking) {
+    return "Belum ada booking yang bisa dibayar. Mau booking dulu, Kak?";
+  }
+
+  const kind = /\bdp\b/i.test(input.text) ? "DP" : "FULL";
+  const result = await executeBookingTool({
+    businessId: input.businessId,
+    contactId: input.contactId,
+    customerName: input.customerName,
+    waId: input.waId,
+    phoneNumberId: input.phoneNumberId,
+    conversationId: input.conversationId,
+    name: "create_payment",
+    argsJson: JSON.stringify({
+      bookingId: booking.id,
+      kind,
+      channel: "QRIS",
+    }),
+  });
+
+  if (
+    result &&
+    typeof result === "object" &&
+    "sentToWhatsApp" in result &&
+    (result as { sentToWhatsApp?: boolean }).sentToWhatsApp
+  ) {
+    return "__SENT__";
+  }
+
+  if (
+    result &&
+    typeof result === "object" &&
+    "error" in result &&
+    typeof (result as { error?: string }).error === "string"
+  ) {
+    return (result as { error: string }).error;
+  }
+
+  return "Siap, pembayaran sedang diproses ya Kak.";
+}
+
 async function runRuleBasedBooking(input: {
   businessId: string;
   contactId: string;
   customerName?: string | null;
   text: string;
 }) {
+  if (
+    (looksLikeGreeting(input.text) || looksLikeAck(input.text)) &&
+    !looksLikeBookingIntent(input.text) &&
+    !looksLikeScheduleQuestion(input.text) &&
+    !looksLikeServiceIntent(input.text)
+  ) {
+    return "Halo Kak 👋 Bisa bantu cek jadwal dokter, info layanan/harga, atau booking treatment. Mau yang mana?";
+  }
+
   const services = await listActiveServices(input.businessId);
   const matchedService = matchServiceFromText(input.text, services);
 
@@ -104,20 +180,54 @@ async function runRuleBasedBooking(input: {
     return `Ini layanan aktif di klinik kami:\n\n${formatServiceList(services)}\n\nMau booking yang mana, Kak?`;
   }
 
-  const doctors = await listConnectedDoctors(input.businessId);
-  if (doctors.length === 0) {
-    return "Saat ini belum ada dokter dengan Google Calendar yang terhubung. Tim kami akan bantu manual ya.";
+  const roster = await prisma.practitioner.findMany({
+    where: { businessId: input.businessId, isActive: true },
+    orderBy: { name: "asc" },
+    select: {
+      name: true,
+      title: true,
+      specialty: true,
+    },
+  });
+
+  const doctorLines =
+    roster.length > 0
+      ? roster
+          .map((doctor) => {
+            const meta = [doctor.title, doctor.specialty].filter(Boolean).join(" · ");
+            return meta ? `• ${doctor.name} (${meta})` : `• ${doctor.name}`;
+          })
+          .join("\n")
+      : "Belum ada dokter aktif di roster.";
+
+  if (
+    /(dokter|siapa)/i.test(input.text) &&
+    !looksLikeBookingIntent(input.text) &&
+    !looksLikeServiceIntent(input.text)
+  ) {
+    return `Dokter aktif di klinik:\n${doctorLines}\n\nMau booking ke siapa, Kak?`;
   }
 
-  if (!looksLikeBookingIntent(input.text)) {
+  if (roster.length === 0) {
+    return "Belum ada dokter aktif di Doctor List. Tim kami akan bantu manual ya.";
+  }
+
+  if (
+    !looksLikeBookingIntent(input.text) &&
+    !looksLikeScheduleQuestion(input.text)
+  ) {
     return null;
   }
 
   const chooseMatch = input.text.match(/\b([1-5])\b/);
   const durationMinutes = matchedService?.durationMin ?? 60;
+  const requested = parseRequestedDay(input.text);
   const slots = await findAvailableSlots({
     businessId: input.businessId,
-    daysAhead: 7,
+    serviceId: matchedService?.id,
+    serviceName: matchedService?.name,
+    daysAhead: requested?.daysAhead ?? 7,
+    fromDate: requested?.fromDate,
     durationMinutes,
   });
 
@@ -150,111 +260,16 @@ async function runRuleBasedBooking(input: {
   }
 
   if (slots.length === 0) {
-    return `Dokter tersedia: ${doctors.map((d) => d.name).join(", ")}.\nSaat ini belum ada slot kosong 7 hari ke depan. Mau coba tanggal lain?`;
+    return `Dokter aktif:\n${doctorLines}\n\nBelum ada slot di jam kerja Schedule (atau sudah terisi appointment). Mau coba tanggal lain?`;
   }
 
   const serviceHint = matchedService
     ? ` untuk ${matchedService.name}`
-    : services.length > 0
-      ? ""
+    : /besok/i.test(input.text)
+      ? " besok"
       : "";
 
-  return `Bisa Kak. Ini slot terdekat${serviceHint} dari dokter yang calendar-nya sudah terhubung:\n\n${formatSlotList(slots)}\n\nBalas angka (1-${Math.min(5, slots.length)}) untuk booking, atau sebutkan preferensi hari/jam.`;
-}
-
-async function runLlmBooking(input: {
-  businessId: string;
-  contactId: string;
-  customerName?: string | null;
-  businessName: string;
-  systemPrompt: string;
-  recentMessages: Array<{ direction: "INBOUND" | "OUTBOUND"; text: string }>;
-  latestText: string;
-  waId: string;
-  phoneNumberId?: string | null;
-  conversationId: string;
-}) {
-  const history: LlmChatMessage[] = [
-    {
-      role: "system",
-      content:
-        renderPromptTemplate(input.systemPrompt, {
-          business: input.businessName,
-          name: input.customerName?.trim() || "Kak",
-        }) + TOOLS_HINT,
-    },
-    ...input.recentMessages.map((message) => ({
-      role: (message.direction === "INBOUND" ? "user" : "assistant") as
-        | "user"
-        | "assistant",
-      content: message.text,
-    })),
-  ];
-
-  if (
-    history[history.length - 1]?.role !== "user" ||
-    history[history.length - 1]?.content !== input.latestText
-  ) {
-    history.push({ role: "user", content: input.latestText });
-  }
-
-  let lastToolSentPayment = false;
-
-  for (let step = 0; step < 6; step += 1) {
-    const completion = await createChatCompletion({
-      messages: history,
-      tools: BOOKING_TOOL_DEFINITIONS,
-      temperature: 0.3,
-    });
-
-    if (!completion?.message) {
-      return null;
-    }
-
-    const message = completion.message;
-    history.push(message);
-
-    const toolCalls = message.tool_calls ?? [];
-    if (toolCalls.length === 0) {
-      if (lastToolSentPayment) {
-        return message.content?.trim() || null;
-      }
-      return message.content?.trim() || null;
-    }
-
-    for (const call of toolCalls) {
-      const result = await executeBookingTool({
-        businessId: input.businessId,
-        contactId: input.contactId,
-        customerName: input.customerName,
-        waId: input.waId,
-        phoneNumberId: input.phoneNumberId,
-        conversationId: input.conversationId,
-        name: call.function.name,
-        argsJson: call.function.arguments,
-      });
-
-      if (
-        result &&
-        typeof result === "object" &&
-        ("sentToWhatsApp" in result || "sent" in result) &&
-        ((result as { sentToWhatsApp?: boolean }).sentToWhatsApp ||
-          (result as { sent?: boolean }).sent)
-      ) {
-        lastToolSentPayment = true;
-      }
-
-      history.push({
-        role: "tool",
-        tool_call_id: call.id,
-        content: JSON.stringify(result),
-      });
-    }
-  }
-
-  return lastToolSentPayment
-    ? null
-    : "Sebentar ya, sistem booking masih memproses. Coba sebutkan hari yang diinginkan.";
+  return `Bisa Kak. Slot kosong${serviceHint}:\n\n${formatSlotList(slots)}\n\nBalas angka (1-${Math.min(5, slots.length)}) untuk booking, atau sebutkan jam yang diinginkan.`;
 }
 
 async function persistOutboundReply(input: {
@@ -291,6 +306,15 @@ async function persistOutboundReply(input: {
       lastPreview: input.text.slice(0, 180),
     },
   });
+  await invalidateChatCache(input.businessId, input.conversationId);
+}
+
+async function conversationAllowsAi(businessId: string, conversationId: string) {
+  const conversation = await prisma.conversation.findFirst({
+    where: { id: conversationId, businessId },
+    select: { aiEnabled: true },
+  });
+  return Boolean(conversation?.aiEnabled);
 }
 
 export async function handleInboundBookingAi(input: {
@@ -302,28 +326,36 @@ export async function handleInboundBookingAi(input: {
   text: string;
   buttonId?: string | null;
   phoneNumberId?: string | null;
+  inboundMessageId?: string | null;
 }) {
-  const settings = await getOrCreateAiAutomationSettings(input.businessId);
-  if (!settings.enabled) {
+  const [settings, aiEnabled] = await Promise.all([
+    getOrCreateAiAutomationSettings(input.businessId),
+    conversationAllowsAi(input.businessId, input.conversationId),
+  ]);
+  if (!settings.enabled || !aiEnabled) {
     return;
   }
 
-  const conversation = await prisma.conversation.findFirst({
-    where: {
-      id: input.conversationId,
+  if (input.inboundMessageId) {
+    void sendWhatsAppTyping({
+      messageId: input.inboundMessageId,
+      phoneNumberId: input.phoneNumberId ?? undefined,
       businessId: input.businessId,
-    },
-    select: { aiEnabled: true },
-  });
-
-  if (!conversation?.aiEnabled) {
-    return;
+    });
   }
 
-  const business = await prisma.business.findUnique({
-    where: { id: input.businessId },
-    select: { name: true },
-  });
+  const [business, inboundCount] = await Promise.all([
+    prisma.business.findUnique({
+      where: { id: input.businessId },
+      select: { name: true },
+    }),
+    prisma.message.count({
+      where: {
+        conversationId: input.conversationId,
+        direction: "INBOUND",
+      },
+    }),
+  ]);
   const businessName = business?.name || "klinik kami";
   const displayName = input.customerName?.trim() || "Kak";
 
@@ -337,12 +369,6 @@ export async function handleInboundBookingAi(input: {
     return input.text;
   })();
 
-  const inboundCount = await prisma.message.count({
-    where: {
-      conversationId: input.conversationId,
-      direction: "INBOUND",
-    },
-  });
   const isFirstMessage = inboundCount <= 1;
 
   if (
@@ -356,6 +382,11 @@ export async function handleInboundBookingAi(input: {
     }).trim();
 
     if (welcome) {
+      if (
+        !(await conversationAllowsAi(input.businessId, input.conversationId))
+      ) {
+        return;
+      }
       await persistOutboundReply({
         conversationId: input.conversationId,
         businessId: input.businessId,
@@ -367,45 +398,30 @@ export async function handleInboundBookingAi(input: {
     }
   }
 
-  const recent = await prisma.message.findMany({
-    where: {
-      conversationId: input.conversationId,
-      text: { not: null },
-    },
-    orderBy: { sentAt: "desc" },
-    take: 8,
-    select: {
-      direction: true,
-      text: true,
-    },
-  });
-
-  const recentMessages = recent
-    .slice()
-    .reverse()
-    .map((item) => ({
-      direction: item.direction,
-      text: item.text || "",
-    }))
-    .filter((item) => item.text.trim().length > 0);
-
+  const startedAt = Date.now();
   let reply: string | null = null;
+  let path = "none";
 
-  try {
-    reply = await runLlmBooking({
+  if (looksLikePaymentIntent(inboundText)) {
+    const paymentReply = await runRuleBasedPayment({
       businessId: input.businessId,
       contactId: input.contactId,
       customerName: input.customerName,
-      businessName,
-      systemPrompt: settings.bookingSystemPrompt,
-      recentMessages,
-      latestText: inboundText,
+      text: inboundText,
       waId: input.waId,
       phoneNumberId: input.phoneNumberId,
       conversationId: input.conversationId,
     });
-  } catch (error) {
-    console.error("[ai booking] llm failed", error);
+    if (paymentReply === "__SENT__") {
+      console.info("[ai booking] replied", {
+        path: "payment",
+        ms: Date.now() - startedAt,
+        conversationId: input.conversationId,
+      });
+      return;
+    }
+    reply = paymentReply;
+    path = "payment";
   }
 
   if (!reply) {
@@ -415,6 +431,7 @@ export async function handleInboundBookingAi(input: {
       customerName: input.customerName,
       text: inboundText,
     });
+    path = reply ? "rules" : "rules-empty";
   }
 
   if (
@@ -431,6 +448,23 @@ export async function handleInboundBookingAi(input: {
   }
 
   if (!reply) {
+    const [roster, services] = await Promise.all([
+      prisma.practitioner.findMany({
+        where: { businessId: input.businessId, isActive: true },
+        orderBy: { name: "asc" },
+        select: { name: true },
+      }),
+      listActiveServices(input.businessId),
+    ]);
+    const doctorNames =
+      roster.map((item) => item.name).join(", ") || "belum diisi";
+    const serviceNames =
+      services.map((item) => item.name).join(", ") || "belum diisi";
+    reply = `Siap Kak. Dokter aktif: ${doctorNames}.\nLayanan: ${serviceNames}.\nMau booking yang mana, atau mau dicek slotnya?`;
+    path = "fallback";
+  }
+
+  if (!(await conversationAllowsAi(input.businessId, input.conversationId))) {
     return;
   }
 
@@ -455,5 +489,10 @@ export async function handleInboundBookingAi(input: {
     waId: input.waId,
     text: reply,
     phoneNumberId: input.phoneNumberId,
+  });
+  console.info("[ai booking] replied", {
+    path,
+    ms: Date.now() - startedAt,
+    conversationId: input.conversationId,
   });
 }

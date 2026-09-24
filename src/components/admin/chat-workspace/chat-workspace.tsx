@@ -13,8 +13,18 @@ import { ChatProfile } from "@/components/admin/chat-workspace/chat-profile";
 import { ChatThread } from "@/components/admin/chat-workspace/chat-thread";
 import { Icon } from "@/components/ui/icon";
 
-const INBOX_POLL_MS = 2500;
-const ROOM_POLL_MS = 1500;
+const INBOX_POLL_MS = 5000;
+const ROOM_POLL_MS = 4000;
+const AI_TOGGLE_GRACE_MS = 4000;
+
+function jakartaTime(date = new Date()) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Jakarta",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
 
 export function ChatWorkspace({ data }: { data: ChatWorkspaceData }) {
   const live = Boolean(data.live);
@@ -44,6 +54,19 @@ export function ChatWorkspace({ data }: { data: ChatWorkspaceData }) {
   const [, startTransition] = useTransition();
   const selectedIdRef = useRef(selectedId);
   const messagesCacheRef = useRef<Record<string, ChatMessage[]>>({});
+  const localAiRef = useRef<Record<string, { value: boolean; at: number }>>({});
+  const inboxInFlightRef = useRef(false);
+  const roomInFlightRef = useRef(false);
+  const inboxRevRef = useRef(data.revision ?? 0);
+  const roomRevRef = useRef<Record<string, number>>({});
+
+  function resolveAiActive(conversationId: string, serverValue: boolean) {
+    const local = localAiRef.current[conversationId];
+    if (local && Date.now() - local.at < AI_TOGGLE_GRACE_MS) {
+      return local.value;
+    }
+    return serverValue;
+  }
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
@@ -96,9 +119,10 @@ export function ChatWorkspace({ data }: { data: ChatWorkspaceData }) {
 
   const loadRoomMessages = useCallback(
     async (conversationId: string, options?: { silent?: boolean }) => {
-      if (!live || !conversationId) {
+      if (!live || !conversationId || roomInFlightRef.current) {
         return;
       }
+      roomInFlightRef.current = true;
 
       if (!options?.silent) {
         const cached = messagesCacheRef.current[conversationId];
@@ -108,20 +132,35 @@ export function ChatWorkspace({ data }: { data: ChatWorkspaceData }) {
       }
 
       try {
+        const hasRev = conversationId in roomRevRef.current;
+        const revQuery = hasRev
+          ? `?rev=${roomRevRef.current[conversationId]}`
+          : "";
         const response = await fetch(
-          `/api/chat/conversations/${conversationId}/messages`,
+          `/api/chat/conversations/${conversationId}/messages${revQuery}`,
           { cache: "no-store" },
         );
         if (!response.ok) {
           return;
         }
-        const payload = (await response.json()) as { messages: ChatMessage[] };
+        const payload = (await response.json()) as {
+          messages?: ChatMessage[];
+          unchanged?: boolean;
+          revision?: number;
+        };
+        if (typeof payload.revision === "number") {
+          roomRevRef.current[conversationId] = payload.revision;
+        }
+        if (payload.unchanged || !payload.messages) {
+          return;
+        }
         if (selectedIdRef.current === conversationId || options?.silent) {
           applyMessages(conversationId, payload.messages);
         } else {
           messagesCacheRef.current[conversationId] = payload.messages;
         }
       } finally {
+        roomInFlightRef.current = false;
         if (!options?.silent) {
           setLoadingMessages(false);
         }
@@ -131,44 +170,60 @@ export function ChatWorkspace({ data }: { data: ChatWorkspaceData }) {
   );
 
   const refreshInbox = useCallback(async () => {
-    if (!live) {
+    if (!live || inboxInFlightRef.current) {
       return;
     }
+    inboxInFlightRef.current = true;
 
-    const response = await fetch("/api/chat/conversations", {
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      return;
-    }
+    try {
+      const response = await fetch(
+        `/api/chat/conversations?rev=${inboxRevRef.current}`,
+        {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        return;
+      }
 
-    const next = (await response.json()) as ChatWorkspaceData;
-    const openId = selectedIdRef.current;
+      const next = (await response.json()) as ChatWorkspaceData & {
+        unchanged?: boolean;
+      };
+      if (typeof next.revision === "number") {
+        inboxRevRef.current = next.revision;
+      }
+      if (next.unchanged || !next.conversations) {
+        return;
+      }
+      const openId = selectedIdRef.current;
 
-    startTransition(() => {
-      setConversations((prev) => {
-        const prevMap = new Map(prev.map((row) => [row.id, row]));
-        return next.conversations.map((row) => {
-          const existing = prevMap.get(row.id);
-          const cachedMessages =
-            messagesCacheRef.current[row.id] ?? existing?.messages ?? [];
-          return {
-            ...row,
-            unread: row.id === openId ? 0 : row.unread,
-            messages: cachedMessages,
-          };
+      startTransition(() => {
+        setConversations((prev) => {
+          const prevMap = new Map(prev.map((row) => [row.id, row]));
+          return next.conversations.map((row) => {
+            const existing = prevMap.get(row.id);
+            const cachedMessages =
+              messagesCacheRef.current[row.id] ?? existing?.messages ?? [];
+            return {
+              ...row,
+              aiActive: resolveAiActive(row.id, row.aiActive),
+              unread: row.id === openId ? 0 : row.unread,
+              messages: cachedMessages,
+            };
+          });
         });
+
+        const open = next.conversations.find((row) => row.id === openId);
+        if (open) {
+          setAiHandling(resolveAiActive(open.id, open.aiActive));
+        }
       });
 
       const open = next.conversations.find((row) => row.id === openId);
-      if (open) {
-        setAiHandling(open.aiActive);
+      if (open && open.unread > 0 && openId) {
+        void markRead(openId);
       }
-    });
-
-    const open = next.conversations.find((row) => row.id === openId);
-    if (open && open.unread > 0 && openId) {
-      void markRead(openId);
+    } finally {
+      inboxInFlightRef.current = false;
     }
   }, [live, markRead]);
 
@@ -229,7 +284,10 @@ export function ChatWorkspace({ data }: { data: ChatWorkspaceData }) {
     });
   }, [conversations, filter, query]);
 
-  const selected = visible.find((item) => item.id === selectedId) ?? visible[0];
+  const selected =
+    conversations.find((item) => item.id === selectedId) ??
+    visible[0] ??
+    conversations[0];
 
   function handleSelect(id: string) {
     setSelectedId(id);
@@ -252,6 +310,7 @@ export function ChatWorkspace({ data }: { data: ChatWorkspaceData }) {
     }
 
     const nextValue = !aiHandling;
+    localAiRef.current[selected.id] = { value: nextValue, at: Date.now() };
     setAiHandling(nextValue);
     setConversations((rows) =>
       rows.map((row) =>
@@ -271,7 +330,9 @@ export function ChatWorkspace({ data }: { data: ChatWorkspaceData }) {
       if (!response.ok) {
         throw new Error("Failed to save AI toggle");
       }
+      localAiRef.current[selected.id] = { value: nextValue, at: Date.now() };
     } catch {
+      localAiRef.current[selected.id] = { value: !nextValue, at: Date.now() };
       setAiHandling(!nextValue);
       setConversations((rows) =>
         rows.map((row) =>
@@ -286,8 +347,36 @@ export function ChatWorkspace({ data }: { data: ChatWorkspaceData }) {
       return;
     }
 
+    const tempId = `local-${crypto.randomUUID()}`;
+    const time = jakartaTime();
+    const pending = {
+      id: tempId,
+      kind: "business",
+      time,
+      text,
+      deliveryStatus: "PENDING",
+    } satisfies ChatMessage;
+
     setSending(true);
     setSendError(null);
+    setAiHandling(false);
+    localAiRef.current[selected.id] = { value: false, at: Date.now() };
+    setConversations((rows) =>
+      rows.map((row) => {
+        if (row.id !== selected.id) {
+          return row;
+        }
+        const messages = [...row.messages, pending];
+        messagesCacheRef.current[row.id] = messages;
+        return {
+          ...row,
+          preview: text,
+          time,
+          aiActive: false,
+          messages,
+        } satisfies ChatConversation;
+      }),
+    );
 
     try {
       const response = await fetch("/api/chat/messages", {
@@ -298,48 +387,65 @@ export function ChatWorkspace({ data }: { data: ChatWorkspaceData }) {
           text,
         }),
       });
-      const payload = (await response.json()) as ChatMessage & { error?: string };
+      const payload = (await response.json()) as ChatMessage & {
+        error?: string;
+      };
 
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to send message.");
-      }
-
-      const outbound =
-        payload.kind === "business"
-          ? payload
-          : ({
-              id: crypto.randomUUID(),
+      const outbound: ChatMessage =
+        payload.kind === "business" && payload.id
+          ? {
+              id: payload.id,
               kind: "business",
-              time: new Intl.DateTimeFormat("en-GB", {
-                timeZone: "Asia/Jakarta",
-                hour: "numeric",
-                minute: "2-digit",
-                hour12: true,
-              }).format(new Date()),
-              text,
-              deliveryStatus: "SENT",
-            } satisfies ChatMessage);
+              time: payload.time,
+              text: payload.text,
+              deliveryStatus: payload.deliveryStatus ?? (response.ok ? "SENT" : "FAILED"),
+            }
+          : {
+              ...pending,
+              deliveryStatus: response.ok ? "SENT" : "FAILED",
+            };
 
       setConversations((rows) =>
         rows.map((row) => {
           if (row.id !== selected.id) {
             return row;
           }
-          const messages = [...row.messages, outbound];
+          const messages = row.messages.map((item) =>
+            item.id === tempId ? outbound : item,
+          );
           messagesCacheRef.current[row.id] = messages;
           return {
             ...row,
             preview: text,
-            time: outbound.time,
+            time: outbound.kind === "business" ? outbound.time : time,
+            aiActive: false,
             messages,
           } satisfies ChatConversation;
         }),
       );
+
+      if (!response.ok) {
+        setSendError(payload.error ?? "Failed to send message.");
+        return;
+      }
+
       void loadRoomMessages(selected.id, { silent: true });
-      void refreshInbox();
     } catch (error) {
       setSendError(error instanceof Error ? error.message : "Failed to send.");
-      throw error;
+      setConversations((rows) =>
+        rows.map((row) => {
+          if (row.id !== selected.id) {
+            return row;
+          }
+          const messages = row.messages.map((item) =>
+            item.id === tempId && item.kind === "business"
+              ? { ...item, deliveryStatus: "FAILED" as const }
+              : item,
+          );
+          messagesCacheRef.current[row.id] = messages;
+          return { ...row, messages };
+        }),
+      );
     } finally {
       setSending(false);
     }

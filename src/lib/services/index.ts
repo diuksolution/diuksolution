@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import {
+  linkNewServiceToAllPractitioners,
+  setServicePractitioners,
+} from "@/lib/booking/catalog";
 import type { ServiceInput, ServiceRow } from "@/lib/services/types";
 
 function mapService(row: {
@@ -10,7 +14,9 @@ function mapService(row: {
   durationMin: number | null;
   isActive: boolean;
   sortOrder: number;
+  practitioners?: Array<{ practitioner: { id: string; name: string } }>;
 }): ServiceRow {
+  const practitioners = (row.practitioners ?? []).map((item) => item.practitioner);
   return {
     id: row.id,
     name: row.name,
@@ -20,8 +26,17 @@ function mapService(row: {
     durationMin: row.durationMin,
     isActive: row.isActive,
     sortOrder: row.sortOrder,
+    practitioners,
+    practitionerIds: practitioners.map((item) => item.id),
   };
 }
+
+const serviceInclude = {
+  practitioners: {
+    include: { practitioner: { select: { id: true, name: true } } },
+    orderBy: { practitioner: { name: "asc" as const } },
+  },
+};
 
 function parseMoney(value: unknown, field: string) {
   const num =
@@ -39,6 +54,7 @@ function parseMoney(value: unknown, field: string) {
 export async function listServices(businessId: string) {
   const rows = await prisma.service.findMany({
     where: { businessId },
+    include: serviceInclude,
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
   return rows.map(mapService);
@@ -47,6 +63,7 @@ export async function listServices(businessId: string) {
 export async function listActiveServices(businessId: string) {
   const rows = await prisma.service.findMany({
     where: { businessId, isActive: true },
+    include: serviceInclude,
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
   return rows.map(mapService);
@@ -78,9 +95,20 @@ export async function createService(businessId: string, input: ServiceInput) {
       isActive: input.isActive ?? true,
       sortOrder: input.sortOrder ?? 0,
     },
+    include: serviceInclude,
   });
 
-  return mapService(row);
+  if (input.practitionerIds) {
+    await setServicePractitioners(businessId, row.id, input.practitionerIds);
+  } else {
+    await linkNewServiceToAllPractitioners(businessId, row.id);
+  }
+
+  const hydrated = await prisma.service.findUnique({
+    where: { id: row.id },
+    include: serviceInclude,
+  });
+  return mapService(hydrated ?? row);
 }
 
 export async function updateService(
@@ -107,6 +135,10 @@ export async function updateService(
     throw new Error("DP tidak boleh lebih besar dari harga.");
   }
 
+  if (input.practitionerIds !== undefined) {
+    await setServicePractitioners(businessId, id, input.practitionerIds);
+  }
+
   const row = await prisma.service.update({
     where: { id },
     data: {
@@ -127,6 +159,7 @@ export async function updateService(
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
     },
+    include: serviceInclude,
   });
 
   return mapService(row);

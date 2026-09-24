@@ -19,6 +19,8 @@ export type PractitionerRow = {
   calendarSyncEnabled: boolean;
   calendarStatus: "connected" | "disconnected";
   displaySpecialty: string;
+  services: Array<{ id: string; name: string }>;
+  serviceIds: string[];
 };
 
 export type PractitionerInput = {
@@ -32,4 +34,5 @@ export type PractitionerInput = {
   isActive?: boolean;
   timezone?: string;
   tone?: PractitionerTone;
+  serviceIds?: string[];
 };

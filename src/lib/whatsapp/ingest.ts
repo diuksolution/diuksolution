@@ -1,5 +1,6 @@
 import type { MessageDeliveryStatus } from "@prisma/client";
 import { handleInboundBookingAi } from "@/lib/ai/booking-orchestrator";
+import { invalidateChatCache } from "@/lib/chat/cache";
 import type { ParsedWhatsAppWebhook } from "@/lib/whatsapp/parse-webhook";
 import { prisma } from "@/lib/prisma";
 
@@ -171,6 +172,8 @@ export async function ingestWhatsAppWebhook(parsed: ParsedWhatsAppWebhook) {
       };
     });
 
+    await invalidateChatCache(number.businessId, saved.conversationId);
+
     if (inbound.text?.trim()) {
       void handleInboundBookingAi({
         businessId: number.businessId,
@@ -181,6 +184,7 @@ export async function ingestWhatsAppWebhook(parsed: ParsedWhatsAppWebhook) {
         text: inbound.text.trim(),
         buttonId: inbound.buttonId,
         phoneNumberId: number.phoneNumberId,
+        inboundMessageId: inbound.messageId,
       }).catch((error) => {
         console.error("[whatsapp ingest] ai booking failed", error);
       });

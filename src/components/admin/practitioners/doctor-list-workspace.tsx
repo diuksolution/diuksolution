@@ -14,6 +14,8 @@ const toneClass: Record<PractitionerTone, string> = {
   success: "bg-success/15 text-success border-success/25",
 };
 
+type CatalogService = { id: string; name: string };
+
 type FormState = {
   name: string;
   title: string;
@@ -24,6 +26,7 @@ type FormState = {
   bio: string;
   tone: PractitionerTone;
   isActive: boolean;
+  serviceIds: string[];
 };
 
 const emptyForm: FormState = {
@@ -36,6 +39,7 @@ const emptyForm: FormState = {
   bio: "",
   tone: "primary",
   isActive: true,
+  serviceIds: [],
 };
 
 function toForm(doctor: PractitionerRow): FormState {
@@ -49,6 +53,7 @@ function toForm(doctor: PractitionerRow): FormState {
     bio: doctor.bio ?? "",
     tone: doctor.tone,
     isActive: doctor.isActive,
+    serviceIds: doctor.serviceIds ?? [],
   };
 }
 
@@ -82,8 +87,10 @@ function InfoCell({ label, value }: { label: string; value: string }) {
 
 export function DoctorListWorkspace({
   doctors: initialDoctors,
+  catalogServices = [],
 }: {
   doctors: PractitionerRow[];
+  catalogServices?: CatalogService[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -174,7 +181,10 @@ export function DoctorListWorkspace({
 
   function openCreate() {
     setMode("create");
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      serviceIds: catalogServices.map((item) => item.id),
+    });
     setError(null);
   }
 
@@ -202,6 +212,7 @@ export function DoctorListWorkspace({
       bio: form.bio || null,
       tone: form.tone,
       isActive: form.isActive,
+      serviceIds: form.serviceIds,
     };
 
     const response =
@@ -507,6 +518,54 @@ export function DoctorListWorkspace({
                   />
                 </Field>
 
+                <div>
+                  <p className="mb-1.5 text-[11px] font-medium tracking-wide text-on-surface-variant uppercase">
+                    Layanan yang ditangani
+                  </p>
+                  {catalogServices.length === 0 ? (
+                    <p className="text-sm text-on-surface-variant">
+                      Belum ada layanan. Tambah di menu Services dulu.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {catalogServices.map((service) => {
+                        const checked = form.serviceIds.includes(service.id);
+                        return (
+                          <label
+                            key={service.id}
+                            className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
+                              checked
+                                ? "border-primary/30 bg-primary/10 text-primary-dark"
+                                : "border-outline-variant bg-white text-on-surface-variant"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={checked}
+                              onChange={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  serviceIds: checked
+                                    ? prev.serviceIds.filter(
+                                        (id) => id !== service.id,
+                                      )
+                                    : [...prev.serviceIds, service.id],
+                                }))
+                              }
+                            />
+                            {service.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <p className="mt-1.5 text-[11px] text-on-surface-variant">
+                    AI hanya boleh booking treatment yang dicentang ke dokter
+                    ini.
+                  </p>
+                </div>
+
                 <div className="flex flex-wrap items-end gap-4">
                   <Field label="Accent">
                     <select
@@ -673,6 +732,28 @@ export function DoctorListWorkspace({
                       </p>
                     </div>
                   ) : null}
+                  <div className="mt-3 rounded-xl bg-surface-container-low px-3.5 py-3">
+                    <p className="text-[11px] tracking-wide text-on-surface-variant uppercase">
+                      Layanan
+                    </p>
+                    {selected.services.length === 0 ? (
+                      <p className="mt-1 text-sm text-on-surface-variant">
+                        Belum di-assign. AI tidak akan booking treatment ke
+                        dokter ini.
+                      </p>
+                    ) : (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {selected.services.map((service) => (
+                          <span
+                            key={service.id}
+                            className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-on-surface shadow-xs"
+                          >
+                            {service.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </section>
 
                 <section className="rounded-2xl border border-outline-variant bg-surface-container-low/40 p-4 sm:p-5">
